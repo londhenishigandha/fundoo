@@ -1,0 +1,18 @@
+
+{% block body_block %}
+    <div>
+            <h1>Login Here !</h1>
+            <form method="post" action="{% url 'fundoonote:user_login' %}">
+                {% csrf_token %}
+                {# A more "HTML" way of creating the login form#}
+                <label for="username">Username:</label>
+                <input type="text" name="username" placeholder="Username" required><br><br>
+                <label for="password">Password:</label>
+                <input type="password" name="password" placeholder="Password" required><br><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <input type="submit" name="" value="Login">
+                <p><strong>-- OR --</strong></p>
+                <a href="{% url 'social:begin' 'github' %}">Login with GitHub</a><br>
+                 <a href="{% url 'social:begin' 'facebook' %}">Login with Facebook</a>
+            </form>
+    </div>
+{% endblock %}
