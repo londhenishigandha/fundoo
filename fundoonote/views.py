@@ -216,10 +216,15 @@ class NoteDetailView(APIView):
         except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
+    def get(self, request,id=None):
+        notes = self.get_object(id)
+        serializer = NoteSerializer(notes).data
+        return Response(serializer)
+
     def put(self, request, id=None):
         data = request.data
-        instance= self.get_object(id)
-        serializer= NoteSerializer(instance, data=data)
+        instance = self.get_object(id)
+        serializer = NoteSerializer(instance, data=data)
         try:
             if serializer.is_valid():
                 serializer.save()
@@ -249,31 +254,10 @@ class NoteDetailView(APIView):
 
 # To Archieve the note
 class ArchieveNote(APIView):
-
-    def get_object(self, id=None):
-        try:
-            return Notes.object.get(id=id)
-        except Notes.DoesNotExist as e:
-            return Response({"error": "Given object not found."}, status=404)
-
-    def put(self, request, id=None):
-            data = request.data
-            instance= self.get_object(id)
-            serializer= NoteSerializer(instance, data=data)
-            notes = Notes.objects.all()
-            try:
-                if serializer.is_valid():
-                    if notes.is_archive == False or None:
-                        notes.is_archive = True
-                        notes.save()
-                    else:
-                        return Response("Already archieve")
-                    return Response("Archieve is set")
-                else:
-                     serializer.save()
-            except serializers.ValidationError:
-                return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                return JsonResponse(serializer.data, status=200)
+    def get(self, request, is_archive=None):
+        notes = Notes.objects.filter(is_archive=True)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
 
 
 # To pin
@@ -306,35 +290,10 @@ class pinNote(APIView):
 
 
 class TrashView(APIView):
-
-    def get_object(self, id=None):
-        try:
-            return Notes.object.get(id=id)
-        except Notes.DoesNotExist as e:
-            return Response({"error": "Given object not found."}, status=404)
-
-    def get(self, request):
-        notes = Notes.objects.all()
+    def get(self, request, is_trash=None):
+        notes = Notes.objects.filter(is_trash=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
-
-    def put(self, request, id=None):
-        data = request.data
-        instance = self.get_object(id)
-        serializer = NoteSerializer(instance, data=data)
-        notes = Notes.objects.all()
-        try:
-            if serializer.is_valid():
-                if notes.is_trash == False or None:
-                    notes.is_trash = True
-                    notes.save()
-                else:
-                    return Response("trash note")
-            else:
-                serializer.save()
-                return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except serializers.ValidationError:
-            return JsonResponse(serializer.data, status=200)
 
 
 class LabelView(APIView):
@@ -364,10 +323,15 @@ class LabelDetailView(APIView):
         except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
+    def get(self, request, id=None):
+        notes = self.get_object(id)
+        serializer = NoteSerializer(notes).data
+        return Response(serializer)
+
     def put(self, request, id=None):
         data = request.data
-        instance= self.get_object(id)
-        serializer= NoteSerializer(instance,data=data)
+        instance = self.get_object(id)
+        serializer = NoteSerializer(instance, data=data)
         try:
             if serializer.is_valid():
                 serializer.save()
