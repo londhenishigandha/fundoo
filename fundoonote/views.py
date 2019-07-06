@@ -13,7 +13,7 @@ from django.contrib.auth.decorators import login_required
 import jwt
 from .service import redis_methods
 from rest_framework import generics, viewsets, status, serializers
-from .models import Notes
+from .models import Notess, Labels
 from .serializers import NoteSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
@@ -34,6 +34,24 @@ from .tokens import account_activation_token
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
 # from  . import s3_upload
+from django_elasticsearch_dsl_drf.constants import (
+    LOOKUP_FILTER_RANGE,
+    LOOKUP_QUERY_IN,
+    LOOKUP_QUERY_GT,
+    LOOKUP_QUERY_GTE,
+    LOOKUP_QUERY_LT,
+    LOOKUP_QUERY_LTE,
+)
+from django_elasticsearch_dsl_drf.filter_backends import (
+    FilteringFilterBackend,
+    OrderingFilterBackend,
+    DefaultOrderingFilterBackend,
+    SearchFilterBackend,
+)
+from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
+
+from fundoonote import documents as documents
+from fundoonote import serializers as articles_serializers
 
 
 def index(request):
@@ -192,7 +210,7 @@ def home(request):
 class NoteView(APIView):
 
     def get(self, request):
-        notes = Notes.objects.all()
+        notes = Notess.objects.all()
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
@@ -211,9 +229,9 @@ class NoteDetailView(APIView):
 
     def get_object(self, id=None):
         try:
-            a = Notes.objects.get(id=id)
+            a = Notess.objects.get(id=id)
             return a
-        except Notes.DoesNotExist as e:
+        except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request,id=None):
@@ -248,14 +266,14 @@ class NoteDetailView(APIView):
             # RETURN THE RESPONSE MESSAGE AND CODE
             return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
             # ELSE EXCEPT THE ERROR AND SEND THE RESPONSE WITH ERROR MESSAGE
-        except Notes.DoesNotExist as e:
+        except Notess.DoesNotExist as e:
             return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
 # To Archieve the note
 class ArchieveNote(APIView):
     def get(self, request, is_archive=None):
-        notes = Notes.objects.filter(is_archive=True)
+        notes = Notess.objects.filter(is_archive=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
@@ -265,15 +283,15 @@ class pinNote(APIView):
 
     def get_object(self, id=None):
         try:
-            return Notes.object.get(id=id)
-        except Notes.DoesNotExist as e:
+            return Notess.object.get(id=id)
+        except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def put(self, request, id=None):
         data = request.data
         instance = self.get_object(id)
         serializer = NoteSerializer(instance, data=data)
-        notes = Notes.objects.all()
+        notes = Notess.objects.all()
         try:
             if serializer.is_valid():
                 if notes.is_pin == False or None:
@@ -291,7 +309,7 @@ class pinNote(APIView):
 
 class TrashView(APIView):
     def get(self, request, is_trash=None):
-        notes = Notes.objects.filter(is_trash=True)
+        notes = Notess.objects.filter(is_trash=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
@@ -299,8 +317,8 @@ class TrashView(APIView):
 class LabelView(APIView):
 
     def get(self, request):
-        notes = Notes.objects.all()
-        serializer = LabelSerializer(notes, many=True).data
+        label = Labels.objects.all()
+        serializer = LabelSerializer(label, many=True).data
         return Response(serializer, status=200)
 
     def post(self, request):
@@ -315,23 +333,22 @@ class LabelView(APIView):
 
 
 class LabelDetailView(APIView):
-
     def get_object(self, id=None):
         try:
-            a = Notes.objects.get(id=id)
+            a = Labels.objects.get(id=id)
             return a
-        except Notes.DoesNotExist as e:
+        except Labels.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
-        notes = self.get_object(id)
-        serializer = NoteSerializer(notes).data
+        label = self.get_object(id)
+        serializer = LabelSerializer(label).data
         return Response(serializer)
 
     def put(self, request, id=None):
         data = request.data
         instance = self.get_object(id)
-        serializer = NoteSerializer(instance, data=data)
+        serializer = LabelSerializer(instance, data=data)
         try:
             if serializer.is_valid():
                 serializer.save()
@@ -339,24 +356,25 @@ class LabelDetailView(APIView):
             return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return JsonResponse(serializer.data, status=200)
 
-    def delete(self, request, id):
-        try:
-            # GET THE OBJECT OF THAT note_od BY PASSING note_id TO THE get_object() FUNCTION
-            instance = self.get_object(id)
-            # CHECK THE NOTE is_deleted and is_trashed status Of both are True Then Update Both The Values
-            print(instance)
-            if instance.is_deleted == False:
-                # UPDATE THE is_deleted
-                instance.is_deleted = True
-                # UPDATE THE is_trashed
-                instance.is_trash = True
-                # SAVE THE RECORD
-                instance.save()
-            # RETURN THE RESPONSE MESSAGE AND CODE
-            return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
-            # ELSE EXCEPT THE ERROR AND SEND THE RESPONSE WITH ERROR MESSAGE
-        except Notes.DoesNotExist as e:
-            return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
+
+def delete(self, request, id):
+    try:
+        # GET THE OBJECT OF THAT note_od BY PASSING note_id TO THE get_object() FUNCTION
+        instance = self.get_object(id)
+        # CHECK THE NOTE is_deleted and is_trashed status Of both are True Then Update Both The Values
+        print(instance)
+        if instance.is_deleted == False:
+            # UPDATE THE is_deleted
+            instance.is_deleted = True
+            # UPDATE THE is_trashed
+            instance.is_trash = True
+            # SAVE THE RECORD
+            instance.save()
+        # RETURN THE RESPONSE MESSAGE AND CODE
+        return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
+        # ELSE EXCEPT THE ERROR AND SEND THE RESPONSE WITH ERROR MESSAGE
+    except Notess.DoesNotExist as e:
+        return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
 # @csrf_exempt
@@ -404,3 +422,59 @@ def awss3(request):
     except Exception as e:
         print(e)
 
+
+class ArticleViewSet(DocumentViewSet):
+    document = documents.ArticleDocument
+    serializer_class = articles_serializers.ArticleDocumentSerializer
+
+    lookup_field = 'id'
+    filter_backends = [
+        FilteringFilterBackend,
+        OrderingFilterBackend,
+        DefaultOrderingFilterBackend,
+        SearchFilterBackend,
+    ]
+
+    # Define search fields
+    search_fields = (
+        'title',
+        'body',
+    )
+
+    # Filter fields
+    filter_fields = {
+        'id': {
+            'field': 'id',
+            'lookups': [
+                LOOKUP_FILTER_RANGE,
+                LOOKUP_QUERY_IN,
+                LOOKUP_QUERY_GT,
+                LOOKUP_QUERY_GTE,
+                LOOKUP_QUERY_LT,
+                LOOKUP_QUERY_LTE,
+            ],
+        },
+        'title': 'title.raw',
+        'body': 'body.raw',
+        'author': {
+            'field': 'author_id',
+            'lookups': [
+                LOOKUP_QUERY_IN,
+            ]
+        },
+        'created': 'created',
+
+    }
+
+    # Define ordering fields
+    ordering_fields = {
+        'id': 'id',
+        'title': 'title.raw',
+        'author': 'author_id',
+        'created': 'created',
+        'modified': 'modified',
+        'pub_date': 'pub_date',
+    }
+
+    # Specify default ordering
+    ordering = ('id', 'created',)

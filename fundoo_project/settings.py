@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'notifications',
     'webpush',
     'fundoonote',
+    'django_elasticsearch_dsl',
+    'django_elasticsearch_dsl_drf',
 ]
 
 MIDDLEWARE = [
@@ -244,3 +246,11 @@ NOTIFICATIONS_CHANNELS = {
 }
 
 CELERY_TASK_ALWAYS_EAGER = True
+
+
+
+ELASTICSEARCH_DSL = {
+    'default': {
+        'hosts': 'localhost:9200'
+    },
+}

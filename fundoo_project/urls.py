@@ -4,6 +4,16 @@ from django.conf.urls import include
 from django.conf.urls import url
 from django.views.generic.base import TemplateView
 from fundoonote import views
+from rest_framework.routers import SimpleRouter
+
+app_name = 'fundoonote'
+
+router = SimpleRouter()
+router.register(
+    prefix=r'',
+    base_name='fundoonote',
+    viewset=views.ArticleViewSet
+)
 
 
 urlpatterns = [
@@ -27,10 +37,10 @@ urlpatterns = [
     path('trash/', views.TrashView.as_view(), name='trash'),
     path('label/', views.LabelView.as_view(), name='label'),
     # url(r'^upload/$', views.upload_file, name='upload'),
-    path('labels/<int:id>', views.LabelDetailView.as_view(), name='labels'),
+    path('labels/<int:id>/', views.LabelDetailView.as_view(), name='labels'),
     path('s3upload/', views.awss3, name='s3upload'),
-    #path('s3upload/', views.upload_file, name='s3upload'),
-   # path('s3upload/', views.S3Upload, name='s3upload'),
+    path('articles/', include('articles.urls')),
+
 
 
 

@@ -16,7 +16,8 @@ def __str__(self):
     return self.user.username
 
 
-class Notes(models.Model):
+class Notess(models.Model):
+    label = models.TextField(null=False, blank=False)
     title = models.TextField(null=False, blank=False)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -30,3 +31,8 @@ class Notes(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Labels(models.Model):
+    label = models.TextField(null=False, blank=False)
+    is_deleted = models.BooleanField(default=False)
