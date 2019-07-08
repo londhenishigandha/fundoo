@@ -1,24 +1,36 @@
-@article_index.doc_type
-class ArticleDocument(DocType):
-    """Article elasticsearch document"""
+from django_elasticsearch_dsl import DocType, Index, fields
 
-    id = fields.IntegerField(attr='id')
+from .index import note_index, html_strip
+from .models import Notess
+from elasticsearch_dsl.connections import connections
+
+connections.create_connection(hosts=['localhost'])
+
+connections.get_connection().cluster.health()
+notes = Index('notes')
+
+
+@note_index.doc_type
+class NotesDocument(DocType):
     title = fields.StringField(
         analyzer=html_strip,
         fields={
             'raw': fields.StringField(analyzer='keyword'),
         }
     )
-    body = fields.TextField(
+    content = fields.TextField(
         analyzer=html_strip,
         fields={
             'raw': fields.TextField(analyzer='keyword'),
         }
     )
-    author = fields.IntegerField(attr='author_id')
-    created = fields.DateField()
-    modified = fields.DateField()
-    pub_date = fields.DateField()
+    color = fields.StringField(
+        analyzer=html_strip,
+        fields={
+            'raw': fields.StringField(analyzer='keyword'),
+        }
+    )
+    created_at = fields.DateField()
 
-    class Meta:
-        model = models.Notess
+    class Meta(object):
+        model = Notess

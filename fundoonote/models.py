@@ -1,7 +1,5 @@
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
-from django.db import models
-from django.utils import timezone
 from django.contrib.auth.models import User
 
 
@@ -17,10 +15,11 @@ def __str__(self):
 
 
 class Notess(models.Model):
-    label = models.TextField(null=False, blank=False)
-    title = models.TextField(null=False, blank=False)
-    content = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
+    label = models.CharField(max_length=100)
+    title = models.CharField(max_length=100)
+    content = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
     color = models.TextField(null=True, blank=True)
     image = models.ImageField(upload_to='static', blank=True)
@@ -34,5 +33,13 @@ class Notess(models.Model):
 
 
 class Labels(models.Model):
-    label = models.TextField(null=False, blank=False)
+    label = models.TextField(max_length=100, unique=True)
     is_deleted = models.BooleanField(default=False)
+    # user = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
+
+
+class Mapping(models.Model):
+
+    label_id = models.IntegerField()
+    note_id = models.IntegerField()
+

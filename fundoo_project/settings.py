@@ -50,10 +50,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'social_django',  # For Social media
     'rest_framework',
+    'rest_framework_swagger',
     'rest_framework.authtoken',
     'notifications',
     'webpush',
     'fundoonote',
+    # Django Elasticsearch integration
     'django_elasticsearch_dsl',
     'django_elasticsearch_dsl_drf',
 ]
@@ -93,7 +95,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'fundoo_project.wsgi.application'
 
-ELASTICSEARCH_DSL={
+ELASTICSEARCH_DSL = {
     'default': {
         'hosts': 'localhost:9200'
     },
@@ -248,9 +250,3 @@ NOTIFICATIONS_CHANNELS = {
 CELERY_TASK_ALWAYS_EAGER = True
 
 
-
-ELASTICSEARCH_DSL = {
-    'default': {
-        'hosts': 'localhost:9200'
-    },
-}

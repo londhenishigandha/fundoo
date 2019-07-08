@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Notess
 from .models import Labels
 from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
-from fundoonote import documents as documents
+from . import documents as NotesDocument
 
 
 class NoteSerializer(serializers.ModelSerializer):
@@ -19,13 +19,11 @@ class LabelSerializer(serializers.ModelSerializer):
         fields = ('id', 'label')
 
 
-class ArticleDocumentSerializer(DocumentSerializer):
+class NotesDocumentSerializer(DocumentSerializer):
+    title = serializers.CharField(read_only=True)
+    content = serializers.CharField(read_only=True)
+    color = serializers.CharField(read_only=True)
+
     class Meta:
-        document = documents.Document
-        fields = (
-            'id',
-            'title',
-            'content',
-            'color',
-            'image',
-        )
+        document = NotesDocument
+        fields = ('id', 'title', 'content', 'color')

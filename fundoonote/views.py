@@ -1,10 +1,9 @@
 import imghdr
 import os
 from boto3.s3.transfer import S3Transfer
-from django.utils.datastructures import MultiValueDictKeyError
-#from . s3_upload import S3Upload
 from rest_framework.response import Response
 import self as self
+from .documents import NotesDocument
 from .forms import UserForm, UserProfileInfoForm
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect, JsonResponse, request
@@ -14,7 +13,7 @@ import jwt
 from .service import redis_methods
 from rest_framework import generics, viewsets, status, serializers
 from .models import Notess, Labels
-from .serializers import NoteSerializer
+from .serializers import NoteSerializer, NotesDocumentSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -33,6 +32,7 @@ from django.template.loader import render_to_string
 from .tokens import account_activation_token
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
+from .models import Mapping
 # from  . import s3_upload
 from django_elasticsearch_dsl_drf.constants import (
     LOOKUP_FILTER_RANGE,
@@ -47,11 +47,8 @@ from django_elasticsearch_dsl_drf.filter_backends import (
     OrderingFilterBackend,
     DefaultOrderingFilterBackend,
     SearchFilterBackend,
-)
+    CompoundSearchFilterBackend, FunctionalSuggesterFilterBackend)
 from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
-
-from fundoonote import documents as documents
-from fundoonote import serializers as articles_serializers
 
 
 def index(request):
@@ -114,8 +111,10 @@ def user_login(request):
         username = request.POST.get('username')
         password = request.POST.get('password')
         # authenticate the user n password
+        print(username, password)
         user = authenticate(username=username, password=password)
         # check if user details is valid or not
+        print(user)
         if user:
             if user.is_active:
                 payload = {
@@ -317,11 +316,15 @@ class TrashView(APIView):
 class LabelView(APIView):
 
     def get(self, request):
+
         label = Labels.objects.all()
         serializer = LabelSerializer(label, many=True).data
         return Response(serializer, status=200)
 
     def post(self, request):
+        print(request.data)
+        user = request.user
+        print(user)
         serializer = LabelSerializer(data=request.data)
         try:
             if serializer.is_valid():
@@ -333,6 +336,7 @@ class LabelView(APIView):
 
 
 class LabelDetailView(APIView):
+
     def get_object(self, id=None):
         try:
             a = Labels.objects.get(id=id)
@@ -423,22 +427,25 @@ def awss3(request):
         print(e)
 
 
-class ArticleViewSet(DocumentViewSet):
-    document = documents.ArticleDocument
-    serializer_class = articles_serializers.ArticleDocumentSerializer
+class NotesDocumentViewSet(DocumentViewSet):
+    print('test')
+    document = NotesDocument
+    serializer_class = NotesDocumentSerializer
 
     lookup_field = 'id'
     filter_backends = [
         FilteringFilterBackend,
         OrderingFilterBackend,
         DefaultOrderingFilterBackend,
-        SearchFilterBackend,
+        CompoundSearchFilterBackend,
+        FunctionalSuggesterFilterBackend
     ]
 
     # Define search fields
     search_fields = (
         'title',
-        'body',
+        'content',
+        'color',
     )
 
     # Filter fields
@@ -455,26 +462,37 @@ class ArticleViewSet(DocumentViewSet):
             ],
         },
         'title': 'title.raw',
-        'body': 'body.raw',
-        'author': {
-            'field': 'author_id',
-            'lookups': [
-                LOOKUP_QUERY_IN,
-            ]
-        },
-        'created': 'created',
-
+        'content': 'content.raw',
+        'color': 'color.raw',
     }
 
     # Define ordering fields
     ordering_fields = {
-        'id': 'id',
         'title': 'title.raw',
-        'author': 'author_id',
-        'created': 'created',
-        'modified': 'modified',
-        'pub_date': 'pub_date',
+        'content': 'content.raw',
+        'color': 'color.raw',
+
     }
 
-    # Specify default ordering
-    ordering = ('id', 'created',)
+    functional_suggester_fields = {
+        'title': 'title.raw',
+        'content': 'content.raw',
+    }
+
+
+# def MapLabel(request, note):
+#     return Response(note)
+
+class MapLabel(APIView):
+
+    def get(self, request, note_id):
+        note_obj = Notess.objects.get(id=note_id)
+        response = {
+            'success': False,
+            'message': 'something went wrong',
+            'data': []
+        }
+        print(note_obj)
+        return JsonResponse(response)
+
+

@@ -2,23 +2,23 @@ from django.contrib import admin
 from django.urls import path
 from django.conf.urls import include
 from django.conf.urls import url
+from rest_framework_swagger.views import get_swagger_view
 from django.views.generic.base import TemplateView
 from fundoonote import views
-from rest_framework.routers import SimpleRouter
+from rest_framework import routers
 
 app_name = 'fundoonote'
 
-router = SimpleRouter()
-router.register(
-    prefix=r'',
-    base_name='fundoonote',
-    viewset=views.ArticleViewSet
-)
+
+router = routers.DefaultRouter()
+router.register(r'search', views.NotesDocumentViewSet, basename='search')
+
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     url(r'^index/$', views.index,name='index'),
+
     url(r'^special/', views.special,name='special'),
     url(r'^fundoonote/', include('fundoonote.urls')),
     path('fundoonote/', include('django.contrib.auth.urls')),
@@ -30,6 +30,7 @@ urlpatterns = [
     url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$',
         views.activate, name='activate'),
     url(r'^oauth/', include('social_django.urls', namespace='social')),  # <--
+    url(r'^swagger/', get_swagger_view(title="API Docs"), name="Docs"),
     path('notes/', views.NoteView.as_view(), name='notes'),
     path('notess/<int:id>/', views.NoteDetailView.as_view(), name='notes'),
     path('archieve', views.ArchieveNote.as_view(), name='archieve'),
@@ -39,12 +40,9 @@ urlpatterns = [
     # url(r'^upload/$', views.upload_file, name='upload'),
     path('labels/<int:id>/', views.LabelDetailView.as_view(), name='labels'),
     path('s3upload/', views.awss3, name='s3upload'),
-    path('articles/', include('articles.urls')),
-
-
-
-
-
+    url('', include(router.urls)),
+    path('lab/<int:note_id>/', views.MapLabel.as_view(), name='lab'),
 ]
+
 
 
