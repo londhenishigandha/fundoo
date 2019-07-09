@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Notess
 from .models import Labels
 from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
-from . import documents as NotesDocument
+from .documents import NotesDocument
 
 
 class NoteSerializer(serializers.ModelSerializer):

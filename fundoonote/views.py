@@ -33,7 +33,6 @@ from .tokens import account_activation_token
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
 from .models import Mapping
-# from  . import s3_upload
 from django_elasticsearch_dsl_drf.constants import (
     LOOKUP_FILTER_RANGE,
     LOOKUP_QUERY_IN,
@@ -206,6 +205,7 @@ def home(request):
     return render(request, 'fundoonote/home.html')
 
 
+# to create a note
 class NoteView(APIView):
 
     def get(self, request):
@@ -224,6 +224,7 @@ class NoteView(APIView):
             return Response(serializer.data, status=200)
 
 
+# to update and delete the note
 class NoteDetailView(APIView):
 
     def get_object(self, id=None):
@@ -306,6 +307,7 @@ class pinNote(APIView):
             return JsonResponse(serializer.data, status=200)
 
 
+# for trash
 class TrashView(APIView):
     def get(self, request, is_trash=None):
         notes = Notess.objects.filter(is_trash=True)
@@ -313,6 +315,7 @@ class TrashView(APIView):
         return Response(serializer, status=200)
 
 
+# to create a label view
 class LabelView(APIView):
 
     def get(self, request):
@@ -335,6 +338,7 @@ class LabelView(APIView):
             return Response(serializer.data, status=200)
 
 
+# for update and delete the label
 class LabelDetailView(APIView):
 
     def get_object(self, id=None):
@@ -381,34 +385,13 @@ def delete(self, request, id):
         return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
-# @csrf_exempt
-# def upload_file(request, file=None):
-#
-#         if request.method == 'POST':
-#             file= request.FILES.get('image')
-#             file_name = 'bird'
-#             s3_client = boto3.client('s3')
-#             s3_client.upload_fileobj(file, 'fundoo-bucket', file_name)
-#             return HttpResponse('Image is uploaded')
-
-
-
 @csrf_exempt
 def awss3(request):
-    """ this method is used to call the uploadto_aws method from s3_transfer  to upload pic in s3 bucket """
-    # res={}
-    #
-    # uploaded_file = request.FILES.get('document')  # GETTING THE FILE FROM LOCAL DISK
-    #
-    # print("Upload Image", uploaded_file)
-    # print(S3Upload.uploadto_aws(request, uploaded_file))  # RETURNING THE FILE FROM LOCAL DISK TO S3 METHOD
-    # return HttpResponse("testing")
-
     try:
         if request.method == 'POST':
             token = redis_methods.get_token(self, 'token')
             print('abc', token)
-        local_directory = '/home/admin1/Python/fundoo_project/media/Images'
+        local_directory = '/home/bridgeit/PycharmProjects/fundoo_project/media'
         transfer = S3Transfer(boto3.client('s3'))
         client = boto3.client('s3')
         bucket = 'fundoo-bucket'
@@ -428,10 +411,8 @@ def awss3(request):
 
 
 class NotesDocumentViewSet(DocumentViewSet):
-    print('test')
     document = NotesDocument
     serializer_class = NotesDocumentSerializer
-
     lookup_field = 'id'
     filter_backends = [
         FilteringFilterBackend,
@@ -441,23 +422,28 @@ class NotesDocumentViewSet(DocumentViewSet):
         FunctionalSuggesterFilterBackend
     ]
 
-    # Define search fields
+    # search in all fields in one request
     search_fields = (
         'title',
         'content',
         'color',
     )
 
-    # Filter fields
+    # List of filter fields
     filter_fields = {
         'id': {
             'field': 'id',
             'lookups': [
+                # to set the extent search,
                 LOOKUP_FILTER_RANGE,
                 LOOKUP_QUERY_IN,
+                # to search elements greater than the given value
                 LOOKUP_QUERY_GT,
+                # to search for the elements equal and greater than the given value
                 LOOKUP_QUERY_GTE,
+                # to search for the elements lesser than the given value
                 LOOKUP_QUERY_LT,
+                # to search for the elements equal and lesser than the given value.
                 LOOKUP_QUERY_LTE,
             ],
         },
@@ -466,7 +452,7 @@ class NotesDocumentViewSet(DocumentViewSet):
         'color': 'color.raw',
     }
 
-    # Define ordering fields
+    # set ordering fields
     ordering_fields = {
         'title': 'title.raw',
         'content': 'content.raw',
@@ -480,19 +466,36 @@ class NotesDocumentViewSet(DocumentViewSet):
     }
 
 
-# def MapLabel(request, note):
-#     return Response(note)
+# def MapLabel(request, note_id):
+#
+#     print(note_id)
+#     label_obj = Labels.objects.get(label='abc')
+#     note_obj = Notess.objects.get(id=note_id)
+#     map_obj = Mapping.objects.create(label_id=label_obj, note_id=note_obj)
+#     response = {
+#         'success': False,
+#         'message': 'something went wrong',
+#         'data': []
+#     }
+#     return JsonResponse(response)
 
+# for collaborate the note
 class MapLabel(APIView):
 
     def get(self, request, note_id):
+
         note_obj = Notess.objects.get(id=note_id)
+
         response = {
-            'success': False,
-            'message': 'something went wrong',
+            'success': True,
+            'message': 'successfully',
             'data': []
         }
+
         print(note_obj)
         return JsonResponse(response)
 
-
+    def update_notes(request, user_id):
+        user = User.objects.get(pk=user_id)
+        user.note = 'welcome'
+        user.save()

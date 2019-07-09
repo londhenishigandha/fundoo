@@ -1,6 +1,7 @@
-from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 # User profile form
@@ -15,6 +16,7 @@ def __str__(self):
 
 
 class Notess(models.Model):
+    # user = models.OneToOneField(User, on_delete="models.CASCADE")
     user = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
     label = models.CharField(max_length=100)
     title = models.CharField(max_length=100)
@@ -27,6 +29,9 @@ class Notess(models.Model):
     is_archive = models.BooleanField(default=False, blank=True)
     is_pin = models.BooleanField(default=False, blank=True)
     is_trash = models.BooleanField(default=False, blank=True)
+
+    class Meta:
+        ordering = ('title',)
 
     def __str__(self):
         return self.title

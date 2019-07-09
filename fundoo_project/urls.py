@@ -14,11 +14,9 @@ router = routers.DefaultRouter()
 router.register(r'search', views.NotesDocumentViewSet, basename='search')
 
 
-
 urlpatterns = [
     path('admin/', admin.site.urls),
     url(r'^index/$', views.index,name='index'),
-
     url(r'^special/', views.special,name='special'),
     url(r'^fundoonote/', include('fundoonote.urls')),
     path('fundoonote/', include('django.contrib.auth.urls')),
@@ -42,6 +40,9 @@ urlpatterns = [
     path('s3upload/', views.awss3, name='s3upload'),
     url('', include(router.urls)),
     path('lab/<int:note_id>/', views.MapLabel.as_view(), name='lab'),
+
+
+
 ]
 
 

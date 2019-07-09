@@ -19,16 +19,6 @@ class UserProfileInfoForm(forms.ModelForm):
         model = UserProfileInfo
         fields = ('portfolio_site', 'profile_pic')
 
-#
-# # sign up form
-# class SignupForm(UserCreationForm):
-#     #  email field take email address while registering for email confirmation.
-#     email = forms.EmailField(max_length=200, help_text='Required')
-#
-#     class Meta:
-#         model = User
-#         fields = ('username', 'email', 'password1', 'password2')
-
 
 class SignupForm(UserCreationForm):
 
