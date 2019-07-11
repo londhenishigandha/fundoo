@@ -1,12 +1,13 @@
-import imghdr
 import os
+import pickle
+import redis
 from boto3.s3.transfer import S3Transfer
 from rest_framework.response import Response
 import self as self
+from fundoo_project.settings import BASE_DIR
 from .documents import NotesDocument
-from .forms import UserForm, UserProfileInfoForm
 from django.contrib.auth import logout
-from django.http import HttpResponseRedirect, JsonResponse, request
+from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 import jwt
@@ -17,14 +18,7 @@ from .serializers import NoteSerializer, NotesDocumentSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
-import logging
 import boto3
-from django.http import HttpResponse
-from botocore.exceptions import ClientError
-from django.http import HttpResponse
-from django.shortcuts import render
-from django.contrib.auth import login, authenticate
-from .forms import SignupForm
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -32,6 +26,10 @@ from django.template.loader import render_to_string
 from .tokens import account_activation_token
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.contrib.auth import login, authenticate
+from .forms import SignupForm
 from .models import Mapping
 from django_elasticsearch_dsl_drf.constants import (
     LOOKUP_FILTER_RANGE,
@@ -45,7 +43,6 @@ from django_elasticsearch_dsl_drf.filter_backends import (
     FilteringFilterBackend,
     OrderingFilterBackend,
     DefaultOrderingFilterBackend,
-    SearchFilterBackend,
     CompoundSearchFilterBackend, FunctionalSuggesterFilterBackend)
 from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
 
@@ -63,45 +60,6 @@ def special(request):
 def user_logout(request):
     logout(request)
     return HttpResponseRedirect(reverse('index'))
-
-
-def register(request):
-    registered = False
-    if request.method == 'POST':
-        user_form = UserForm(data=request.POST)
-        profile_form = UserProfileInfoForm(data=request.POST)
-        # Save User Form to Database
-        if user_form.is_valid() and profile_form.is_valid():
-            user = user_form.save()
-            # Hash the password
-            user.set_password(user.password)
-            # Update with Hashed password
-            user.save()
-            profile = profile_form.save(commit=False)
-            # Set One to One relationship between
-            # UserForm and UserProfileInfoForm
-            profile.user = user
-            # Check if they provided a profile picture
-            if 'profile_pic' in request.FILES:
-                print('found it')
-                profile.profile_pic = request.FILES['profile_pic']
-            # save model
-            profile.save()
-            registered = True
-        else:
-            # One of the forms was invalid if this else gets called.
-            print(user_form.errors, profile_form.errors)
-    else:
-        # Was not an HTTP post so we just render the forms as blank.
-        user_form = UserForm()
-        profile_form = UserProfileInfoForm()
-        # This is the render and context dictionary to feed
-        # back to the registration.html file page.
-    return render(request, 'fundoonote/registration.html',
-                           {
-                               'user_form': user_form,
-                               'profile_form': profile_form,
-                               'registered': registered})
 
 
 @csrf_exempt
@@ -137,7 +95,7 @@ def user_login(request):
                         'status_code': 200
                 }
                 return JsonResponse({'result':result})
-                #decode_jwt_token
+            # decode_jwt_token
             else:
                 message = "Your account was inactive."
                 status_code =400
@@ -151,38 +109,79 @@ def user_login(request):
             return JsonResponse({'message':message, 'status': status_code})
     else:
         return render(request, 'fundoonote/login.html', {})
+#
+# # method for sign up
+# @csrf_exempt
+# def signup(request):
+#     if request.method == 'POST':
+#         form = SignupForm(request.POST)
+#         if form.is_valid():
+#             # after form.save () user is created
+#             user = form.save(commit=False)
+#             # user can’t login without email confirmation.
+#             user.is_active = False
+#             user.save()
+#             current_site = get_current_site(request)
+#             message = render_to_string('account_activation_email.html', {
+#                 'user': user, 'domain': current_site.domain,
+#                 'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+#                 'token': account_activation_token.make_token(user,),
+#             })
+#             # Sending activation link in terminal
+#             # user.email_user(subject, message)
+#             mail_subject = 'Activate your blog account.'
+#             to_email = form.cleaned_data.get('email')
+#             email = EmailMessage(mail_subject, message, to=[to_email])
+#             email.send()
+#             return HttpResponse('Please confirm your email address to complete the registration.')
+#             # return render(request, 'acc_active_sent.html')
+#         return render(request, 'fundoonote/login.html', {'form': form})
+#     else:
+#         form = SignupForm()
+#     return render(request, 'fundoonote/signup.html', {'form': form})
 
-# method for sign up
+
 @csrf_exempt
 def signup(request):
     if request.method == 'POST':
         form = SignupForm(request.POST)
         if form.is_valid():
-            # after form.save () user is created
             user = form.save(commit=False)
-            # user can’t login without email confirmation.
             user.is_active = False
             user.save()
             current_site = get_current_site(request)
-            message = render_to_string('account_activation_email.html', {
-                'user': user, 'domain': current_site.domain,
-                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
-                'token': account_activation_token.make_token(user,),
-            })
-            # Sending activation link in terminal
-            # user.email_user(subject, message)
             mail_subject = 'Activate your blog account.'
+            message = render_to_string('acc_active_email.html', {
+                'user': user,
+                'domain': current_site.domain,
+                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                'token': account_activation_token.make_token(user),
+            })
             to_email = form.cleaned_data.get('email')
-            email = EmailMessage(mail_subject, message, to=[to_email])
+            email = EmailMessage(
+                        mail_subject, message, to=[to_email]
+            )
             email.send()
-            return HttpResponse('Please confirm your email address to complete the registration.')
-            # return render(request, 'acc_active_sent.html')
-        return render(request, 'fundoonote/login.html', {'form': form})
+            return HttpResponse('Please confirm your email address to complete the registration')
     else:
         form = SignupForm()
-    return render(request, 'fundoonote/signup.html', {'form': form})
-
-
+    return render(request, 'signup.html', {'form': form})
+#
+# @csrf_exempt
+# def activate(request, uidb64, token):
+#     try:
+#         uid = force_text(urlsafe_base64_decode(uidb64))
+#         user = User.objects.get(pk=uid)
+#     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+#         user = None
+#     if user is not None and account_activation_token.check_token(user, token):
+#         # check token if it valid then user will active and login
+#         user.is_active = True
+#         user.save()
+#         login(request, user)
+#         return HttpResponse('Thank you for your email confirmation. Now you can login your account.')
+#     else:
+#         return HttpResponse('Activation link is invalid!')
 @csrf_exempt
 def activate(request, uidb64, token):
     try:
@@ -191,10 +190,10 @@ def activate(request, uidb64, token):
     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
-        # check token if it valid then user will active and login
         user.is_active = True
         user.save()
-        login(request, user)
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        # return redirect('home')
         return HttpResponse('Thank you for your email confirmation. Now you can login your account.')
     else:
         return HttpResponse('Activation link is invalid!')
@@ -211,6 +210,13 @@ class NoteView(APIView):
     def get(self, request):
         notes = Notess.objects.all()
         serializer = NoteSerializer(notes, many=True).data
+        r = redis.StrictRedis('localhost')
+        mydict = notes
+        p_mydict = pickle.dumps(mydict)
+        r.set('mydict', p_mydict)
+        read_dict = r.get('mydict')
+        yourdict = pickle.loads(read_dict)
+        print("Notes in redis cache", yourdict)
         return Response(serializer, status=200)
 
     def post(self, request):
@@ -252,20 +258,19 @@ class NoteDetailView(APIView):
 
     def delete(self, request, id):
         try:
-            # GET THE OBJECT OF THAT note_od BY PASSING note_id TO THE get_object() FUNCTION
+            # get the object of that note_od by passing note_id to the getobject() FUNCTION
             instance = self.get_object(id)
-            # CHECK THE NOTE is_deleted and is_trashed status Of both are True Then Update Both The Values
+            # check the note is_deleted and is_trashed status Of both are true then update both the values
             print(instance)
             if instance.is_deleted == False:
-                # UPDATE THE is_deleted
+                # update the is_deleted
                 instance.is_deleted = True
-                # UPDATE THE is_trashed
+                # update the  is_trashed
                 instance.is_trash = True
-                # SAVE THE RECORD
+                # save the record
                 instance.save()
-            # RETURN THE RESPONSE MESSAGE AND CODE
+            # return the response
             return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
-            # ELSE EXCEPT THE ERROR AND SEND THE RESPONSE WITH ERROR MESSAGE
         except Notess.DoesNotExist as e:
             return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
@@ -304,7 +309,7 @@ class pinNote(APIView):
                 serializer.save()
         except serializers.ValidationError:
             return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            return JsonResponse(serializer.data, status=200)
+        return JsonResponse(serializer.data, status=200)
 
 
 # for trash
@@ -367,39 +372,57 @@ class LabelDetailView(APIView):
 
 def delete(self, request, id):
     try:
-        # GET THE OBJECT OF THAT note_od BY PASSING note_id TO THE get_object() FUNCTION
+        # get the object of that note_od by passing note_id to the get_object() function
         instance = self.get_object(id)
-        # CHECK THE NOTE is_deleted and is_trashed status Of both are True Then Update Both The Values
+        # check the node is_deleted and is_trashed status Of both are True Then Update Both The Values
         print(instance)
         if instance.is_deleted == False:
-            # UPDATE THE is_deleted
+            # update the is_deleted
             instance.is_deleted = True
-            # UPDATE THE is_trashed
+            # update the is_trashed
             instance.is_trash = True
-            # SAVE THE RECORD
+            # save the record
             instance.save()
-        # RETURN THE RESPONSE MESSAGE AND CODE
+        # return the response
         return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
-        # ELSE EXCEPT THE ERROR AND SEND THE RESPONSE WITH ERROR MESSAGE
     except Notess.DoesNotExist as e:
         return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
 @csrf_exempt
 def awss3(request):
+    # try:
+    #     if request.method == 'POST':
+    #         local_directory = os.path.join(BASE_DIR, "Images")
+    #         transfer = S3Transfer(boto3.client('s3'))
+    #         client = boto3.client('s3')
+    #         bucket = 'fundoo-bucket'
+    #         # recursively copy files from local directory to boto bucket
+    #         for root, dirs, files in os.walk(local_directory):
+    #             for filename in files:
+    #                 local_path = os.path.join(root, 'rose.jpeg')
+    #                 relative_path = os.path.relpath(local_path, local_directory)
+    #                 s3_path = os.path.join('s3 path1', relative_path)
+    #                 if filename.endswith('.jpeg'):
+    #                     transfer.upload_file(local_path, bucket, s3_path, extra_args={'ACL': 'private-read'})
+    #                 else:
+    #                     transfer.upload_file(local_path, bucket, s3_path)
+    #     return HttpResponse("Image is Upload")
+    # except Exception as e:
+    #     return e
     try:
         if request.method == 'POST':
             token = redis_methods.get_token(self, 'token')
             print('abc', token)
-        local_directory = '/home/bridgeit/PycharmProjects/fundoo_project/media'
+        local_directory = '/home/bridgeit/PycharmProjects/fundoo_project/media/Images'
         transfer = S3Transfer(boto3.client('s3'))
         client = boto3.client('s3')
         bucket = 'fundoo-bucket'
         for root, dirs, files in os.walk(local_directory):
             for filename in files:
-                local_path = os.path.join(root, 'login.jpeg')
+                local_path = os.path.join(root, 'sheet.jpg')
                 relative_path = os.path.relpath(local_path, local_directory)
-                s3_path = os.path.join('s3 path', relative_path)
+                s3_path = os.path.join('s3 path1', relative_path)
                 if filename.endswith('.pdf'):
                     transfer.upload_file(local_path, bucket, s3_path, extra_args={'ACL': 'private-read'})
                 else:
@@ -409,7 +432,34 @@ def awss3(request):
     except Exception as e:
         print(e)
 
+@csrf_exempt
+def s3_upload(request):
+    try:
+        message = None
+        status_code = 500
+        if request.method == 'POST':
+            # taking input image files
+            uploaded_file = request.FILES.get('document')
+            if uploaded_file is None:
+                message = "Empty file can not be uploaded"
+                status_code = 400
+                return JsonResponse({'message': message, 'status': status_code})
+            else:
+                file_name = 'image'
+                s3_client = boto3.client('s3')
+                s3_client.upload_fileobj(uploaded_file, 'fundoo-bucket', Key=file_name)
+                message = "Image successfully uploaded"
+                status_code = 200     # success msg
+                return JsonResponse({'message': message, 'status': status_code})
+        else:
+            status_code = 400    # bad request
+            message = "The request is not valid."
+        return JsonResponse({'message': message, 'status': status_code})
+    except RuntimeError:
+        print(" ")
 
+
+# For note document view to search data
 class NotesDocumentViewSet(DocumentViewSet):
     document = NotesDocument
     serializer_class = NotesDocumentSerializer
@@ -466,36 +516,23 @@ class NotesDocumentViewSet(DocumentViewSet):
     }
 
 
-# def MapLabel(request, note_id):
-#
-#     print(note_id)
-#     label_obj = Labels.objects.get(label='abc')
-#     note_obj = Notess.objects.get(id=note_id)
-#     map_obj = Mapping.objects.create(label_id=label_obj, note_id=note_obj)
-#     response = {
-#         'success': False,
-#         'message': 'something went wrong',
-#         'data': []
-#     }
-#     return JsonResponse(response)
-
 # for collaborate the note
 class MapLabel(APIView):
 
     def get(self, request, note_id):
+        user_auth = request.user
+        if user_auth:
+            note_obj = Notess.objects.get(id=note_id)
 
-        note_obj = Notess.objects.get(id=note_id)
+            response = {
+                'success': True,
+                'message': 'successfully',
+                'data': []
+            }
 
-        response = {
-            'success': True,
-            'message': 'successfully',
-            'data': []
-        }
+            print(note_obj)
+            return JsonResponse(response)
+        else:
+            return HttpResponse("You are not logged in ")
 
-        print(note_obj)
-        return JsonResponse(response)
 
-    def update_notes(request, user_id):
-        user = User.objects.get(pk=user_id)
-        user.note = 'welcome'
-        user.save()

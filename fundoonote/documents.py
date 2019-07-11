@@ -13,7 +13,7 @@ notes = Index('notes')
 @note_index.doc_type
 class NotesDocument(DocType):
     title = fields.StringField(
-        # analyzer: Split the piece of text into individual token
+        # analyzer: Split the piece of text into individual token &  replaces HTML entities with their decoded value
         analyzer=html_strip,
         fields={
             'raw': fields.StringField(analyzer='keyword'),

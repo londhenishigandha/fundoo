@@ -1,7 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 
 # User profile form
@@ -29,6 +27,7 @@ class Notess(models.Model):
     is_archive = models.BooleanField(default=False, blank=True)
     is_pin = models.BooleanField(default=False, blank=True)
     is_trash = models.BooleanField(default=False, blank=True)
+    #collaborate = models.ManyToManyField(User)
 
     class Meta:
         ordering = ('title',)
@@ -40,11 +39,13 @@ class Notess(models.Model):
 class Labels(models.Model):
     label = models.TextField(max_length=100, unique=True)
     is_deleted = models.BooleanField(default=False)
-    # user = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
+    note = models.ManyToManyField(Notess, blank=True)
 
 
 class Mapping(models.Model):
-
-    label_id = models.IntegerField()
+    label_id = models.ForeignKey(Labels, on_delete=models.CASCADE, default=1)
     note_id = models.IntegerField()
 
+
+def __str__(self):
+    return self.title
