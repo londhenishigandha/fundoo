@@ -1,10 +1,12 @@
+import json
 import os
 import pickle
 import redis
 from boto3.s3.transfer import S3Transfer
+from django.utils.decorators import method_decorator
 from rest_framework.response import Response
 import self as self
-from fundoo_project.settings import BASE_DIR
+from .decorators import my_login_required
 from .documents import NotesDocument
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect, JsonResponse
@@ -27,7 +29,7 @@ from .tokens import account_activation_token
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
 from .forms import SignupForm
 from .models import Mapping
@@ -59,6 +61,7 @@ def special(request):
 @login_required
 def user_logout(request):
     logout(request)
+    redis_methods.flush(self)
     return HttpResponseRedirect(reverse('index'))
 
 
@@ -70,6 +73,7 @@ def user_login(request):
         # authenticate the user n password
         print(username, password)
         user = authenticate(username=username, password=password)
+        login(request, user)
         # check if user details is valid or not
         print(user)
         if user:
@@ -79,15 +83,19 @@ def user_login(request):
                     'email': user.email,
                 }
                 # it will create a token
-                jwt_token = {'token': jwt.encode(payload, "SECRET_KEY")}
+                # jwt_token = {'token': jwt.encode(payload, "SECRET_KEY")}
+                jwt_token = jwt.encode(payload, 'secret', 'HS256').decode('utf-8')
                 # print the token
                 print("token", jwt_token)
+                # decoded_token = jwt.decode(jwt_token, 'secret', algorithms=['HS256'])
+                # print("decoded", decoded_token)
                 redis_methods.set_token(self, 'token', jwt_token)
                 redistoken = redis_methods.get_token(self, 'token')
                 print("token in redis", redistoken)
                 login(request, user)
                 message = "You have successfully login"
                 res = message
+
                 result ={
                         'message': res,
                         'username': user.username,
@@ -109,36 +117,6 @@ def user_login(request):
             return JsonResponse({'message':message, 'status': status_code})
     else:
         return render(request, 'fundoonote/login.html', {})
-#
-# # method for sign up
-# @csrf_exempt
-# def signup(request):
-#     if request.method == 'POST':
-#         form = SignupForm(request.POST)
-#         if form.is_valid():
-#             # after form.save () user is created
-#             user = form.save(commit=False)
-#             # user can’t login without email confirmation.
-#             user.is_active = False
-#             user.save()
-#             current_site = get_current_site(request)
-#             message = render_to_string('account_activation_email.html', {
-#                 'user': user, 'domain': current_site.domain,
-#                 'uid': urlsafe_base64_encode(force_bytes(user.pk)),
-#                 'token': account_activation_token.make_token(user,),
-#             })
-#             # Sending activation link in terminal
-#             # user.email_user(subject, message)
-#             mail_subject = 'Activate your blog account.'
-#             to_email = form.cleaned_data.get('email')
-#             email = EmailMessage(mail_subject, message, to=[to_email])
-#             email.send()
-#             return HttpResponse('Please confirm your email address to complete the registration.')
-#             # return render(request, 'acc_active_sent.html')
-#         return render(request, 'fundoonote/login.html', {'form': form})
-#     else:
-#         form = SignupForm()
-#     return render(request, 'fundoonote/signup.html', {'form': form})
 
 
 @csrf_exempt
@@ -166,22 +144,8 @@ def signup(request):
     else:
         form = SignupForm()
     return render(request, 'signup.html', {'form': form})
-#
-# @csrf_exempt
-# def activate(request, uidb64, token):
-#     try:
-#         uid = force_text(urlsafe_base64_decode(uidb64))
-#         user = User.objects.get(pk=uid)
-#     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
-#         user = None
-#     if user is not None and account_activation_token.check_token(user, token):
-#         # check token if it valid then user will active and login
-#         user.is_active = True
-#         user.save()
-#         login(request, user)
-#         return HttpResponse('Thank you for your email confirmation. Now you can login your account.')
-#     else:
-#         return HttpResponse('Activation link is invalid!')
+
+
 @csrf_exempt
 def activate(request, uidb64, token):
     try:
@@ -206,9 +170,17 @@ def home(request):
 
 # to create a note
 class NoteView(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request):
-        notes = Notess.objects.all()
+
+        redistoken = redis_methods.get_token(self, 'token')  # gets the token from the redis cache
+        print("get the  Token", redistoken)
+        # decodes the token
+        decoded_token = jwt.decode(redistoken, 'secret', algorithms=['HS256'])
+        # decodes the jwt token and gets the value of user details
+        user_id = decoded_token.get('id')
+        user = User.objects.get(id=user_id)
+        notes = Notess.objects.filter(created_by=user)
         serializer = NoteSerializer(notes, many=True).data
         r = redis.StrictRedis('localhost')
         mydict = notes
@@ -219,15 +191,21 @@ class NoteView(APIView):
         print("Notes in redis cache", yourdict)
         return Response(serializer, status=200)
 
+    @method_decorator(my_login_required)
     def post(self, request):
+        redistoken = redis_methods.get_token(self, 'token')  # gets the token from the redis cache
+        # decodes the token
+        decoded_token = jwt.decode(redistoken, 'secret', algorithms=['HS256'])
+        # decodes the jwt token and gets the value of user details
+        user_id = decoded_token.get('id')
+        user = User.objects.get(id=user_id)
         serializer = NoteSerializer(data=request.data)
         try:
             if serializer.is_valid():
-                serializer.save()
+                serializer.save(created_by=user)
         except serializers.ValidationError:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response(serializer.data, status=200)
+        return Response(serializer.data)
 
 
 # to update and delete the note
@@ -391,46 +369,28 @@ def delete(self, request, id):
 
 @csrf_exempt
 def awss3(request):
-    # try:
-    #     if request.method == 'POST':
-    #         local_directory = os.path.join(BASE_DIR, "Images")
-    #         transfer = S3Transfer(boto3.client('s3'))
-    #         client = boto3.client('s3')
-    #         bucket = 'fundoo-bucket'
-    #         # recursively copy files from local directory to boto bucket
-    #         for root, dirs, files in os.walk(local_directory):
-    #             for filename in files:
-    #                 local_path = os.path.join(root, 'rose.jpeg')
-    #                 relative_path = os.path.relpath(local_path, local_directory)
-    #                 s3_path = os.path.join('s3 path1', relative_path)
-    #                 if filename.endswith('.jpeg'):
-    #                     transfer.upload_file(local_path, bucket, s3_path, extra_args={'ACL': 'private-read'})
-    #                 else:
-    #                     transfer.upload_file(local_path, bucket, s3_path)
-    #     return HttpResponse("Image is Upload")
-    # except Exception as e:
-    #     return e
+
     try:
         if request.method == 'POST':
-            token = redis_methods.get_token(self, 'token')
-            print('abc', token)
-        local_directory = '/home/bridgeit/PycharmProjects/fundoo_project/media/Images'
-        transfer = S3Transfer(boto3.client('s3'))
-        client = boto3.client('s3')
-        bucket = 'fundoo-bucket'
-        for root, dirs, files in os.walk(local_directory):
-            for filename in files:
-                local_path = os.path.join(root, 'sheet.jpg')
-                relative_path = os.path.relpath(local_path, local_directory)
-                s3_path = os.path.join('s3 path1', relative_path)
-                if filename.endswith('.pdf'):
-                    transfer.upload_file(local_path, bucket, s3_path, extra_args={'ACL': 'private-read'})
-                else:
-                    transfer.upload_file(local_path, bucket, s3_path)
-        return HttpResponse("Image is Upload")
+            local_directory = '/home/bridgeit/PycharmProjects/fundoo_project/media/Images'
+            transfer = S3Transfer(boto3.client('s3'))
+            client = boto3.client('s3')
+            bucket = 'fundoo-bucket'
+            # recursively copy files from local directory to boto bucket
+            for root, dirs, files in os.walk(local_directory):
+                for filename in files:
+                    local_path = os.path.join(root, 'sheet.jpg')
+                    relative_path = os.path.relpath(local_path, local_directory)
+                    s3_path = os.path.join('s3 path1', relative_path)
+                    if filename.endswith('.jpeg'):
+                        transfer.upload_file(local_path, bucket, s3_path, extra_args={'ACL': 'private-read'})
+                    else:
+                        transfer.upload_file(local_path, bucket, s3_path)
+            return HttpResponse("Image is Upload")
 
     except Exception as e:
-        print(e)
+        return e
+
 
 @csrf_exempt
 def s3_upload(request):
@@ -517,22 +477,79 @@ class NotesDocumentViewSet(DocumentViewSet):
 
 
 # for collaborate the note
+# class MapLabel(APIView):
+#
+#     #@method_decorator(my_login_required)
+#     def get(self, request, note_id):
+#         user_auth = request.user
+#         # it will check if the user is logged in or not
+#         if user_auth:
+#             note_obj = Notess.objects.get(id=note_id)
+#
+#             response = {
+#                 'success': True,
+#                 'message': 'successfully',
+#                 'data': []
+#             }
+#
+#             print(note_obj)
+#
+#             return JsonResponse(response)
+#
+#         else:
+#             return HttpResponse("You are not logged in ")
+#
+
+
+# class MapLabel(APIView):
+#
+#     #@method_decorator(my_login_required)
+#     def get(self, request, note_id):
+#         redistoken = redis_methods.get_token(self, 'token')  # gets the token from the redis cache
+#         # decodes the token
+#         decoded_token = jwt.decode(redistoken, 'secret', algorithms=['HS256'])
+#         # decodes the jwt token and gets the value of user details
+#         user_id = decoded_token.get('id')
+#         user = User.objects.get(id=user_id)
+#         notes = Notess.objects.filter(created_by=user)
+#         # it will check if the user is logged in or not
+#         note_obj = Notess.objects.get(id=note_id)
+#
+#         response = {
+#             'success': True,
+#             'message': 'successfully',
+#             'data': []
+#         }
+#
+#         print(note_obj)
+#
+#         return JsonResponse(response)
+
+
 class MapLabel(APIView):
 
+    # @method_decorator(my_login_required)
     def get(self, request, note_id):
-        user_auth = request.user
-        if user_auth:
-            note_obj = Notess.objects.get(id=note_id)
-
-            response = {
-                'success': True,
-                'message': 'successfully',
-                'data': []
-            }
-
-            print(note_obj)
-            return JsonResponse(response)
-        else:
-            return HttpResponse("You are not logged in ")
-
+        redistoken = redis_methods.get_token(self, 'token')  # gets the token from the redis cache
+        # decodes the token
+        decoded_token = jwt.decode(redistoken, 'secret', algorithms=['HS256'])
+        # print(decoded_token)
+        # decodes the jwt token and gets the value of user details
+        user_id = decoded_token.get('id')
+        # email = decoded_token.get('email')
+        # print("email id ", email)
+        user = User.objects.get(id=user_id)
+        notes = Notess.objects.filter(created_by=user)
+        serializer = NoteSerializer(notes, many=True).data
+        # it will check if the user is logged in or not
+        note_obj = Notess.objects.get(id=note_id)
+        mydict = notes
+        p_mydict = pickle.dumps(mydict)
+        yourdict = pickle.loads(p_mydict)
+        print('dgfd', yourdict)
+        if request.method == 'POST':
+            note_id = notes.id  # getting the note id
+            print("Notess", note_id)
+        print(yourdict)
+        return HttpResponse('notes')
 

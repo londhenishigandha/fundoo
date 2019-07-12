@@ -14,8 +14,7 @@ def __str__(self):
 
 
 class Notess(models.Model):
-    # user = models.OneToOneField(User, on_delete="models.CASCADE")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, default=1, related_name='owner')
     label = models.CharField(max_length=100)
     title = models.CharField(max_length=100)
     content = models.CharField(max_length=100)
@@ -27,7 +26,7 @@ class Notess(models.Model):
     is_archive = models.BooleanField(default=False, blank=True)
     is_pin = models.BooleanField(default=False, blank=True)
     is_trash = models.BooleanField(default=False, blank=True)
-    #collaborate = models.ManyToManyField(User)
+    collaborate = models.ManyToManyField(User, null=True, blank=True, related_name='collaborate_user')
 
     class Meta:
         ordering = ('title',)
@@ -46,6 +45,5 @@ class Mapping(models.Model):
     label_id = models.ForeignKey(Labels, on_delete=models.CASCADE, default=1)
     note_id = models.IntegerField()
 
-
-def __str__(self):
-    return self.title
+    def __str__(self):
+        return self.title

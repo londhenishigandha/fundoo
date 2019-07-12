@@ -41,9 +41,8 @@ urlpatterns = [
     path('s3upload/', views.awss3, name='s3upload'),
     path('image_upload/', views.s3_upload, name='image_upload'),
     url('', include(router.urls)),
-    path('map/<int:note_id>/', views.MapLabel.as_view(), name='map'),
-
-
+    #path('map/<int:note_id>/', views.MapLabel.as_view(), name='map'),
+    path('map/', views.MapLabel.as_view(), name='map'),
 
 ]
 
