@@ -7,7 +7,8 @@ app_name = 'fundoonote'
 
 urlpatterns = [
     url(r'^user_login/$', views.user_login, name='user_login'),
-    url(r'^signup/$', views.signup, name='signup'),
+   #url(r'^signup/$', views.signup, name='signup'),
+    # url(r'^register/$', views.RegisterView().as_view, name='register'),
     url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$',
         views.activate, name='activate'),
     path('archieve/', views.ArchieveNote.as_view(), name='archieve'),

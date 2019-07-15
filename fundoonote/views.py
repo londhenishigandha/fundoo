@@ -16,7 +16,7 @@ import jwt
 from .service import redis_methods
 from rest_framework import generics, viewsets, status, serializers
 from .models import Notess, Labels
-from .serializers import NoteSerializer, NotesDocumentSerializer
+from .serializers import NoteSerializer, NotesDocumentSerializer, RegisterSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -31,8 +31,7 @@ from django.core.mail import EmailMessage
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
-from .forms import SignupForm
-from .models import Mapping
+
 from django_elasticsearch_dsl_drf.constants import (
     LOOKUP_FILTER_RANGE,
     LOOKUP_QUERY_IN,
@@ -64,87 +63,86 @@ def user_logout(request):
     redis_methods.flush(self)
     return HttpResponseRedirect(reverse('index'))
 
-
 @csrf_exempt
 def user_login(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        # authenticate the user n password
-        print(username, password)
-        user = authenticate(username=username, password=password)
-        login(request, user)
-        # check if user details is valid or not
-        print(user)
-        if user:
-            if user.is_active:
-                payload = {
-                    'id': user.id,
-                    'email': user.email,
-                }
-                # it will create a token
-                # jwt_token = {'token': jwt.encode(payload, "SECRET_KEY")}
-                jwt_token = jwt.encode(payload, 'secret', 'HS256').decode('utf-8')
-                # print the token
-                print("token", jwt_token)
-                # decoded_token = jwt.decode(jwt_token, 'secret', algorithms=['HS256'])
-                # print("decoded", decoded_token)
-                redis_methods.set_token(self, 'token', jwt_token)
-                redistoken = redis_methods.get_token(self, 'token')
-                print("token in redis", redistoken)
-                login(request, user)
-                message = "You have successfully login"
-                res = message
+    res =[]
+    try:
+        if request.method == 'POST':
+            username = request.POST.get('username')
+            password = request.POST.get('password')
+            user = authenticate(username=username, password=password)
+            if user:
+                if user.is_active:
+                    # creating JWT token
+                    payload = {
+                        'id': user.id,
+                        'email': user.email,
+                    }
+                    jwt_token = jwt.encode(payload, 'secret', 'HS256').decode('utf-8')
+                    print("11111111111111", jwt_token)
+                    redis_methods.set_token(self, 'token', jwt_token)
+                    restoken = redis_methods.get_token(self, 'token')
+                    print("token in redis", restoken)
+                    login(request, user)
+                    message = "you have successfully logged in"
+                    res = message
+                    result ={
+                            'message': res,
+                            'username': user.username,
+                            'Password': user.password,
+                            'Email': user.email,
+                            'status_code': 200
 
-                result ={
-                        'message': res,
-                        'username': user.username,
-                        'password': user.password,
-                        'status_code': 200
-                }
-                return JsonResponse({'result':result})
-            # decode_jwt_token
+                    }
+                    return JsonResponse({'result': result})
+                else:
+                    message = "Your account was inactive."
+                    status_code = 400
+                    return JsonResponse({'message': message, 'status': status_code})
             else:
-                message = "Your account was inactive."
-                status_code =400
-                return JsonResponse({'message':message, 'status': status_code})
+                print("Someone tried to login and failed.")
+                print("They used username: {} and password: {}".format(username, password))
+                message = "Invalid login details given"
+                status_code = 400
 
+                return JsonResponse({'message': message, 'status': status_code})
         else:
-            print("Someone tried to login and failed.")
-            print("They used username: {} and password: {}".format(username, password))
-            message = "Invalid login details given"
-            status_code = 400
-            return JsonResponse({'message':message, 'status': status_code})
-    else:
-        return render(request, 'fundoonote/login.html', {})
+            return render(request, 'fundoonote/login.html', {})
+    except RuntimeError:
+        print(" ")
 
 
-@csrf_exempt
-def signup(request):
-    if request.method == 'POST':
-        form = SignupForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.is_active = False
-            user.save()
-            current_site = get_current_site(request)
-            mail_subject = 'Activate your blog account.'
-            message = render_to_string('acc_active_email.html', {
-                'user': user,
-                'domain': current_site.domain,
-                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
-                'token': account_activation_token.make_token(user),
-            })
-            to_email = form.cleaned_data.get('email')
-            email = EmailMessage(
-                        mail_subject, message, to=[to_email]
-            )
-            email.send()
-            return HttpResponse('Please confirm your email address to complete the registration')
-    else:
-        form = SignupForm()
-    return render(request, 'signup.html', {'form': form})
+class RegisterView(APIView):
+    serializer_class = RegisterSerializer
+    def post(self, request):
 
+        redis = redis_methods()
+        serializer = RegisterSerializer(data=request.data)
+        print("Serializers",serializer)
+        print(serializer.is_valid())
+        if serializer.is_valid():
+            user = serializer.save()
+            if user:
+                # get the current site url
+                current_site = get_current_site(request)
+                # create the email subject
+                mail_subject = "Activate Your Account"
+                # create the email body with activation link
+                message = render_to_string("acc_active_email.html",{
+                                            'user': user, # pass the user
+                                            'domain': current_site.domain, # pass the current domail
+                                            'uid': urlsafe_base64_encode(force_bytes(user.pk)), # pass the uid in byte format
+                                            'token': account_activation_token.make_token(user) # pass the token
+                                        })
+                to_email = serializer.validated_data.get('email') # get the user email
+                print(to_email)
+                email = EmailMessage(mail_subject, message, to=[to_email])
+                email.send() # send the mail for activation account
+                # return message
+                # return HttpResponse('Please confirm your email address to complete the registration')
+                print(serializer.data)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors)
 
 @csrf_exempt
 def activate(request, uidb64, token):

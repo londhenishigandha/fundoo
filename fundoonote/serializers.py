@@ -1,8 +1,31 @@
+from django.contrib.auth.models import User
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
+
 from .models import Notess
 from .models import Labels
 from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
 from .documents import NotesDocument
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.EmailField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
+    username = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all())])
+    password = serializers.CharField(min_length=8)
+
+    class Meta:
+        model = User
+        fields = ('first_name','last_name','email','username','password',)
+
+    def create(self, validated_data):
+        user = User.objects.create(**validated_data)
+        user.is_active = False
+        user.set_password(user.password)
+        user.save()
+        return user
 
 
 class NoteSerializer(serializers.ModelSerializer):

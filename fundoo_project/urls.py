@@ -16,18 +16,19 @@ router.register(r'search', views.NotesDocumentViewSet, basename='search')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    url(r'^index/$', views.index,name='index'),
-    url(r'^special/', views.special,name='special'),
+    url(r'^index/$', views.index, name='index'),
+    url(r'^special/', views.special, name='special'),
     url(r'^fundoonote/', include('fundoonote.urls')),
     path('fundoonote/', include('django.contrib.auth.urls')),
     path('', TemplateView.as_view(template_name='home.html'), name='home'),
-    url(r'^signup/$', views.signup, name='signup'),
+    #url(r'^signup/$', views.signup, name='signup'),
+    url(r'^register/$', views.RegisterView.as_view(), name='register'),
     url(r'^login/$', views.user_login, name='login'),
     url(r'^logout/$', views.user_logout, name='logout'),
     # url(r'^signup/$', views.signup, name='signup'),
     # url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$',
     #     views.activate, name='activate'),
-    url(r'^signup/$', views.signup, name='signup'),
+    # url(r'^signup/$', views.signup, name='signup'),
     url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$', views.activate, name='activate'),
     url(r'^oauth/', include('social_django.urls', namespace='social')),  # <--
     url(r'^swagger/', get_swagger_view(title="API Docs"), name="Docs"),
