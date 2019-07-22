@@ -55,9 +55,9 @@ INSTALLED_APPS = [
     'notifications',
     'webpush',
     'fundoonote',
-    # Django Elasticsearch integration
     'django_elasticsearch_dsl',
     'django_elasticsearch_dsl_drf',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
@@ -69,7 +69,16 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',  # social media auth
+
+    # 'fundoonote.CorsMiddleware',
+
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.BrokenLinkEmailsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+
 ]
+
+CORS_ORIGIN_ALLOW_ALL = True
 
 ROOT_URLCONF = 'fundoo_project.urls'
 
@@ -131,12 +140,12 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
-WEBPUSH_SETTINGS = {
-   "VAPID_PUBLIC_KEY": "BDp1yxiN_Q-nRY2tyjotejESsp2V8Vop-BG4INxinpYI8i2_SZL7eGpBOXBMcD6L0VUZsqDZn9YrR55reh90IG8",
-   "VAPID_PRIVATE_KEY": "JnuCdR5G6qofJIxaCNOfg1IM-2C4Ikeq8rYmZ5UPjuI",
-   "VAPID_ADMIN_EMAIL": "londhenishigandha123@gmail.com"
-}
+#
+# WEBPUSH_SETTINGS = {
+#    "VAPID_PUBLIC_KEY": "BDp1yxiN_Q-nRY2tyjotejESsp2V8Vop-BG4INxinpYI8i2_SZL7eGpBOXBMcD6L0VUZsqDZn9YrR55reh90IG8",
+#    "VAPID_PRIVATE_KEY": "JnuCdR5G6qofJIxaCNOfg1IM-2C4Ikeq8rYmZ5UPjuI",
+#    "VAPID_ADMIN_EMAIL": "londhenishigandha123@gmail.com"
+# }
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/

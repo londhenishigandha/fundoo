@@ -8,6 +8,12 @@ from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
 from .documents import NotesDocument
 
 
+# class LoginSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = User
+#         fields = ('username', 'password')
+
+
 class RegisterSerializer(serializers.ModelSerializer):
 
     first_name = serializers.CharField()
@@ -18,7 +24,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('first_name','last_name','email','username','password',)
+        fields = ('first_name', 'last_name', 'email', 'username', 'password',)
 
     def create(self, validated_data):
         user = User.objects.create(**validated_data)
@@ -32,7 +38,7 @@ class NoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notess
-        fields = ('id', 'title', 'content', 'created_at', 'updated_at', 'image', 'color', 'is_archive', 'is_pin', 'is_trash', 'created_by')
+        fields = ('id', 'title', 'content', 'created_at', 'updated_at', 'image', 'color', 'is_archive', 'is_pin', 'is_trash', 'created_by', 'collaborate')
 
 
 class LabelSerializer(serializers.ModelSerializer):
@@ -50,3 +56,12 @@ class NotesDocumentSerializer(DocumentSerializer):
     class Meta:
         document = NotesDocument
         fields = ('id', 'title', 'content', 'color')
+
+
+class LoginSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(max_length=100)
+    password = serializers.CharField(max_length=100)
+
+    class Meta:
+        model = User
+        fields =('username', 'password')

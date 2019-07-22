@@ -26,7 +26,7 @@ class Notess(models.Model):
     is_archive = models.BooleanField(default=False, blank=True)
     is_pin = models.BooleanField(default=False, blank=True)
     is_trash = models.BooleanField(default=False, blank=True)
-    collaborate = models.ManyToManyField(User, null=True, blank=True, related_name='collaborate_user')
+    collaborate = models.ManyToManyField(User, related_name='collaborate_user', blank=True)
 
     class Meta:
         ordering = ('title',)

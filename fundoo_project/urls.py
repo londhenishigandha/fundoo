@@ -21,19 +21,16 @@ urlpatterns = [
     url(r'^fundoonote/', include('fundoonote.urls')),
     path('fundoonote/', include('django.contrib.auth.urls')),
     path('', TemplateView.as_view(template_name='home.html'), name='home'),
-    #url(r'^signup/$', views.signup, name='signup'),
     url(r'^register/$', views.RegisterView.as_view(), name='register'),
+    url(r'^forgot/$', views.Forgot.as_view(), name='forgot'),
     url(r'^login/$', views.user_login, name='login'),
     url(r'^logout/$', views.user_logout, name='logout'),
-    # url(r'^signup/$', views.signup, name='signup'),
-    # url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$',
-    #     views.activate, name='activate'),
-    # url(r'^signup/$', views.signup, name='signup'),
     url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$', views.activate, name='activate'),
     url(r'^oauth/', include('social_django.urls', namespace='social')),  # <--
     url(r'^swagger/', get_swagger_view(title="API Docs"), name="Docs"),
     path('notes/', views.NoteView.as_view(), name='notes'),
     path('notesview/<int:id>/', views.NoteDetailView.as_view(), name='notesview'),
+    path('notesview/', views.NoteDetailView.as_view(), name='notesview'),
     path('archieve', views.ArchieveNote.as_view(), name='archieve'),
     path('pin/', views.pinNote.as_view(), name='pin'),
     path('trash/', views.TrashView.as_view(), name='trash'),
@@ -42,8 +39,11 @@ urlpatterns = [
     path('s3upload/', views.awss3, name='s3upload'),
     path('image_upload/', views.s3_upload, name='image_upload'),
     url('', include(router.urls)),
-    #path('map/<int:note_id>/', views.MapLabel.as_view(), name='map'),
-    path('map/', views.MapLabel.as_view(), name='map'),
+    # path('api/login', views.login, name='login'),
+    # url(r'^loginuser/$', views.LoginView.as_view(), name='loginuser'),
+    # url(r'^log/$', views.Login.as_view(), name='log'),
+
+
 
 ]
 
