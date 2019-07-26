@@ -3,6 +3,7 @@ import os
 import pickle
 import redis
 from boto3.s3.transfer import S3Transfer
+import logging
 from django.utils.decorators import method_decorator
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
@@ -19,7 +20,7 @@ import jwt
 from .service import redis_methods
 from rest_framework import generics, viewsets, status, serializers
 from .models import Notess, Labels
-from .serializers import NoteSerializer, NotesDocumentSerializer, RegisterSerializer, LoginSerializer
+from .serializers import NoteSerializer, NotesDocumentSerializer, RegisterSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -57,6 +58,8 @@ from django_elasticsearch_dsl_drf.filter_backends import (
     CompoundSearchFilterBackend, FunctionalSuggesterFilterBackend)
 from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
 
+logger = logging.getLogger(__name__)
+
 
 def index(request):
     return render(request, 'fundoonote/index.html')
@@ -78,14 +81,14 @@ def user_logout(request):
 def user_login(request):
 
     # print(request.data)
-    request_data=json.loads((request.body).decode('utf-8'))
+    request_data = json.loads((request.body).decode('utf-8'))
     # request_data=eval(request_data1)
     # print(request_data1)
 
     # import ast
     # request_data=ast.literal_eval(request_data1)
 
-    print(type(request_data),'------------>')
+    print(type(request_data), '------------>')
     print(request_data)
 
     if request.method == 'POST':
@@ -122,9 +125,13 @@ def user_login(request):
                         'message': res,
                         'username': user.username,
                         'password': user.password,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
                         # 'status_code': 200,
                         'jwt_token': jwt_token
                 }
+                print(result)
                 return JsonResponse({'result': result})
                 #  decode_jwt_token
             else:
@@ -177,14 +184,20 @@ class RegisterView(APIView):
 
 @csrf_exempt
 def activate(request, uidb64, token):
+    request_data = json.loads((request.body).decode('utf-8'))
+    password = request_data['password']
+
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
+        print(user)
     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
+        user.set_password(password)
         user.save()
+        # user.set_password(request.data)
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         # return redirect('home')
         return HttpResponse('Thank you for your email confirmation. Now you can login your account.')
@@ -206,7 +219,7 @@ class Forgot(APIView):
             # create the email body with activation link
             message = render_to_string("acc_active_email.html", {
                 'user': user,  # pass the user
-                'domain': current_site.domain,  # pass the current domail
+                'domain': 'localhost:3000/resetpassword',  # pass the current domail
                 'uid': urlsafe_base64_encode(force_bytes(user.pk)),  # pass the uid in byte format
                 'token': account_activation_token.make_token(user)  # pass the token
                 })
@@ -239,9 +252,12 @@ def forgot_pass_activate(request, uidb64, token):
 
 @csrf_exempt
 def confirm(request, uidb64, token):
+
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
+
+        print(user)
     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
@@ -258,8 +274,9 @@ def home(request):
 # to create a note
 class NoteView(APIView):
     serializer_class = NoteSerializer
-    def get(self, request):
+    permission_classes = [AllowAny]
 
+    def get(self, request):
         redistoken = redis_methods.get_token(self, 'token')  # gets the token from the redis cache
         print("get the  Token", redistoken)
         # decodes the token
@@ -267,7 +284,7 @@ class NoteView(APIView):
         # decodes the jwt token and gets the value of user details
         user_id = decoded_token.get('id')
         user = User.objects.get(id=user_id)
-        notes = Notess.objects.filter(created_by=user)
+        notes = Notess.objects.filter(created_by=user, is_trash=False)
         serializer = NoteSerializer(notes, many=True).data
         r = redis.StrictRedis('localhost')
         mydict = notes
@@ -277,43 +294,49 @@ class NoteView(APIView):
         yourdict = pickle.loads(read_dict)
         print("Notes in redis cache", yourdict)
         return Response(serializer, status=200)
+    #
+    # def post(self, request):
+    #     result = {"message": "something bad happened",  # give the element in rest api
+    #               "success": False,
+    #               "data": {}}
+    #     try:
+    #         data = request.data
+    #         serializer = NoteSerializer(data=data)
+    #         print(serializer)
+    #         print(serializer.is_valid())
+    #         if serializer.is_valid(raise_exception=True):
+    #             serializer.save()
+    #             result["message"] = "Note created successfully "
+    #             result['success'] = True
+    #             result["data"] = serializer.data
+    #             result['mail'] = "mail send successfully"
+    #             notes = json.dump(result)
+    #             for collab_id in serializer.data['collaborate']:
+    #                 user = User.objects.get(id=collab_id)
+    #                 print(collab_id)
+    #                 if user:
+    #                     send_mail('Subject here', notes, request.user.email, [str(user.email)], fail_silently=False)
+    #
+    #         return Response(result, status=200)
+    #     except:
+    #         return Response(result, status=400)
+
 
     def post(self, request):
-        result = {"message": "something bad happened",  # give the element in rest api
-                  "success": False,
-                  "data": {}}
+        restoken = redis_methods.get_token(self, 'token')
+        decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+        print("decode token ", decoded_token)
+        dec_id = decoded_token.get('id')
+        print("user id", dec_id)
+        user = User.objects.get(id=dec_id)
+        print("username", user)
+        serializer = NoteSerializer(data=request.data)
         try:
-            data = request.data
-            serializer = NoteSerializer(data=data)
-            print(serializer)
-            print(serializer.is_valid())
-            if serializer.is_valid(raise_exception=True):
-                serializer.save()
-                result["message"] = "Note created successfully "
-                result['success'] = True
-                result["data"] = serializer.data
-                result['mail'] = "mail send successfully"
-                notes = json.dump(result)
-                for collab_id in serializer.data['collaborate']:
-                    user = User.objects.get(id=collab_id)
-                    print(collab_id)
-                    if user:
-                        send_mail('Subject here', notes, request.user.email, [str(user.email)], fail_silently=False)
-
-            return Response(result, status=200)
-        except:
-            return Response(result, status=400)
-
-    # def post(self, request):
-    #     serializer = NoteSerializer(data=request.data)
-    #     try:
-    #         if serializer.is_valid():
-    #             serializer.save()
-    #
-    #     except serializers.ValidationError:
-    #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    #     else:
-    #         return Response(serializer.data, status=200)
+            if serializer.is_valid():
+                serializer.save(created_by=user)
+        except serializers.ValidationError:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.data)
 
 
 # to update and delete the note
@@ -334,7 +357,9 @@ class NoteDetailView(APIView):
     def put(self, request, id=None):
         data = request.data
         instance = self.get_object(id)
-        serializer = NoteSerializer(instance, data=data)
+        serializer = NoteSerializer(instance, data=data, partial=True)
+        print(data)
+        print(serializer.is_valid())
         try:
             if serializer.is_valid():
                 serializer.save()
@@ -363,10 +388,58 @@ class NoteDetailView(APIView):
 
 # To Archieve the note
 class ArchieveNote(APIView):
-    def get(self, request, is_archive=None):
+
+    def get_object(self, id=None):
+        try:
+            a = Notess.objects.get(id=id)
+            return a
+        except Notess.DoesNotExist as e:
+            return Response({"error": "Given object not found."}, status=404)
+
+    def get(self, request):
         notes = Notess.objects.filter(is_archive=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
+
+    def put(self, request, id=None):
+        """  This handles PUT request to achieve particular note by note id  """
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        logger.info("Enter In The PUT Method Set archive API")
+        data = request.data['is_archive']
+        print("Data", data)
+        try:
+            if not id:
+                raise ValueError
+            logger.debug("Enter In The Try Block")
+            # get the note object by passing the note id
+            instance = self.get_object(id)
+            if not instance:
+                raise Notess.DoesNotExist
+            # check note is not trash and not deleted
+            print(instance, "=====================")
+            if not instance.is_archive:
+                # update the record and set the archive
+                instance.is_archive = data
+                instance.save()
+                # return the success message and archive data
+                result["message"] = "Archive Set Successfully"
+                result["success"] = True
+                result["data"] = data
+                logger.debug("Return The Response To The Browser..")
+                return Response(result, status=200)
+        # except the exception and return the response
+        except ValueError as e:
+            result["Message"] = "Note id cant blank"
+            logger.debug("Return The Response To The Browser..")
+            return Response(result, status=204)
+        except Notess.DoesNotExist as e:
+            result["message"] = "No record found for note id "
+            logger.debug("Return The Response To The Browser..")
+        return Response(result, status=204)
 
 
 # To pin
@@ -475,6 +548,55 @@ def delete(self, request, id):
         return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
+class SetReminder(APIView):
+    def get_object(self, id=None):
+        try:
+            a = Notess.objects.get(id=id)
+            return a
+        except Notess.DoesNotExist as e:
+            return Response({"error": "Given object not found."}, status=404)
+
+    def put(self, request, id=None):
+        """  This handles PUT request to set the reminder to perticular note by note id  """
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        logger.info("Enter In The PUT Method Set Reminder API")
+        data = request.data['reminder']
+        print("Data", data)
+        try:
+            if not id:
+                raise ValueError
+            logger.debug("Enter In The Try Block")
+            # get the note object by passing the note id
+            instance = self.get_object(id)
+            if not instance:
+                raise Notess.DoesNotExist
+            # check note is not trash and not deleted
+            print(instance, "=====================")
+            if not instance.is_trash:
+                # update the record and set the reminder
+                instance.reminder = data
+                instance.save()
+                # return the success message and reminder data
+                result["message"] = "Reminder Set Successfully"
+                result["success"] = True
+                result["data"] = data
+                logger.debug("Return The Response To The Browser..")
+                return Response(result, status=200)
+        # except the exception and return the response
+        except ValueError as e:
+            result["Message"] = "Note id cant blank"
+            logger.debug("Return The Response To The Browser..")
+            return Response(result, status=204)
+        except Notess.DoesNotExist as e:
+            result["message"] = "No record found for note id "
+            logger.debug("Return The Response To The Browser..")
+        return Response(result, status=204)
+
+
 @csrf_exempt
 def awss3(request):
 
@@ -487,7 +609,7 @@ def awss3(request):
             # recursively copy files from local directory to boto bucket
             for root, dirs, files in os.walk(local_directory):
                 for filename in files:
-                    local_path = os.path.join(root, 'sheet.jpg')
+                    local_path = os.path.join(root, 'sheet.jpeg')
                     relative_path = os.path.relpath(local_path, local_directory)
                     s3_path = os.path.join('s3 path1', relative_path)
                     if filename.endswith('.jpeg'):
@@ -508,6 +630,7 @@ def s3_upload(request):
         if request.method == 'POST':
             # taking input image files
             uploaded_file = request.FILES.get('document')
+            print(uploaded_file)
             if uploaded_file is None:
                 message = "Empty file can not be uploaded"
                 status_code = 400
@@ -522,7 +645,8 @@ def s3_upload(request):
         else:
             status_code = 400    # bad request
             message = "The request is not valid."
-        return JsonResponse({'message': message, 'status': status_code})
+            return JsonResponse({'message': message, 'status': status_code})
+
     except RuntimeError:
         print(" ")
 

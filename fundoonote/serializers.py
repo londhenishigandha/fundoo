@@ -38,7 +38,7 @@ class NoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notess
-        fields = ('id', 'title', 'content', 'created_at', 'updated_at', 'image', 'color', 'is_archive', 'is_pin', 'is_trash', 'created_by', 'collaborate')
+        fields = ('id', 'title', 'content', 'created_at', 'updated_at', 'image', 'color', 'is_archive', 'is_pin', 'is_trash', 'created_by', 'reminder', 'collaborate')
 
 
 class LabelSerializer(serializers.ModelSerializer):
@@ -57,11 +57,3 @@ class NotesDocumentSerializer(DocumentSerializer):
         document = NotesDocument
         fields = ('id', 'title', 'content', 'color')
 
-
-class LoginSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(max_length=100)
-    password = serializers.CharField(max_length=100)
-
-    class Meta:
-        model = User
-        fields =('username', 'password')

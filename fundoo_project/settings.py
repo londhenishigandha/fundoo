@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 from __future__ import absolute_import
 import os
 from dotenv import load_dotenv, find_dotenv
+import logging
 
 
 # This will make sure the app is always imported when
@@ -63,16 +64,13 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',  # social media auth
-
-    # 'fundoonote.CorsMiddleware',
-
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.BrokenLinkEmailsMiddleware',
     'django.middleware.common.CommonMiddleware',
 
@@ -166,6 +164,7 @@ REST_FRAMEWORK = {
             'rest_framework.authentication.TokenAuthentication',
     )
 }
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
@@ -258,4 +257,6 @@ NOTIFICATIONS_CHANNELS = {
 
 CELERY_TASK_ALWAYS_EAGER = True
 
-
+# logger
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('This will get logged')
