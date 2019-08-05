@@ -175,8 +175,6 @@ class RegisterView(APIView):
                 print(to_email)
                 email = EmailMessage(mail_subject, message, to=[to_email])
                 email.send()  # send the mail for activation account
-                # return message
-                # return HttpResponse('Please confirm your email address to complete the registration')
                 print(serializer.data)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors)
@@ -184,9 +182,6 @@ class RegisterView(APIView):
 
 @csrf_exempt
 def activate(request, uidb64, token):
-    request_data = json.loads((request.body).decode('utf-8'))
-    password = request_data['password']
-
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
@@ -195,9 +190,7 @@ def activate(request, uidb64, token):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
-        user.set_password(password)
         user.save()
-        # user.set_password(request.data)
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         # return redirect('home')
         return HttpResponse('Thank you for your email confirmation. Now you can login your account.')
@@ -284,43 +277,63 @@ class NoteView(APIView):
         # decodes the jwt token and gets the value of user details
         user_id = decoded_token.get('id')
         user = User.objects.get(id=user_id)
-        notes = Notess.objects.filter(created_by=user, is_trash=False)
+        print("Name of the user: ", user)
+        notes = Notess.objects.filter(is_trash=False, created_by=user).order_by('id')
+        # labels= Labels.objects.filter(id=user_id)
         serializer = NoteSerializer(notes, many=True).data
+
+        length = len(serializer)
+        print(length, '------------->')
+        my_labels = []
+        for index in range(0, length):
+            if len(serializer[index]['label']) is not 0:
+                for lb in range(0, len(serializer[index]['label'])):
+                    label_id = serializer[index]['label'].pop(lb)
+                    print(serializer[index]['label'])
+                    label_name = Labels.objects.get(id=label_id).label
+                    print(label_name)
+                    serializer[index]['label'].insert(0, label_name)
         r = redis.StrictRedis('localhost')
         mydict = notes
         p_mydict = pickle.dumps(mydict)
         r.set('mydict', p_mydict)
         read_dict = r.get('mydict')
         yourdict = pickle.loads(read_dict)
-        print("Notes in redis cache", yourdict)
+        # print("Notes in redis cache", yourdict)
+
         return Response(serializer, status=200)
-    #
+
     # def post(self, request):
     #     result = {"message": "something bad happened",  # give the element in rest api
     #               "success": False,
     #               "data": {}}
     #     try:
+    #         restoken = redis_methods.get_token(self, 'token')
+    #         decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+    #         print("decode token ", decoded_token)
+    #         dec_id = decoded_token.get('id')
+    #         print("user id", dec_id)
     #         data = request.data
+    #         user = User.objects.get(id=dec_id)
     #         serializer = NoteSerializer(data=data)
     #         print(serializer)
     #         print(serializer.is_valid())
     #         if serializer.is_valid(raise_exception=True):
-    #             serializer.save()
+    #             serializer.save(created_by=user)
     #             result["message"] = "Note created successfully "
     #             result['success'] = True
     #             result["data"] = serializer.data
     #             result['mail'] = "mail send successfully"
     #             notes = json.dump(result)
-    #             for collab_id in serializer.data['collaborate']:
-    #                 user = User.objects.get(id=collab_id)
-    #                 print(collab_id)
+    #             for i in serializer.data['collaborate']:
+    #                 user = User.objects.get(id=i)
+    #                 print(i)
     #                 if user:
     #                     send_mail('Subject here', notes, request.user.email, [str(user.email)], fail_silently=False)
     #
     #         return Response(result, status=200)
     #     except:
     #         return Response(result, status=400)
-
 
     def post(self, request):
         restoken = redis_methods.get_token(self, 'token')
@@ -349,7 +362,7 @@ class NoteDetailView(APIView):
         except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
-    def get(self, request,id=None):
+    def get(self, request, id=None):
         notes = self.get_object(id)
         serializer = NoteSerializer(notes).data
         return Response(serializer)
@@ -484,8 +497,19 @@ class LabelView(APIView):
 
     def get(self, request):
 
-        label = Labels.objects.all()
+        label = Labels.objects.filter(is_deleted=False)
         serializer = LabelSerializer(label, many=True).data
+
+        print('serializer----<>', serializer)
+
+        length = len(serializer)
+        my_labels = []
+        for index in range(0, length):
+
+            my_labels.append(serializer[index]['label'])
+
+        print(my_labels)
+
         return Response(serializer, status=200)
 
     def post(self, request):
@@ -493,6 +517,7 @@ class LabelView(APIView):
         user = request.user
         print(user)
         serializer = LabelSerializer(data=request.data)
+        # print(serializer.errors)
         try:
             if serializer.is_valid():
                 serializer.save()
@@ -528,24 +553,23 @@ class LabelDetailView(APIView):
             return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return JsonResponse(serializer.data, status=200)
 
-
-def delete(self, request, id):
-    try:
-        # get the object of that note_od by passing note_id to the get_object() function
-        instance = self.get_object(id)
-        # check the node is_deleted and is_trashed status Of both are True Then Update Both The Values
-        print(instance)
-        if instance.is_deleted == False:
-            # update the is_deleted
-            instance.is_deleted = True
-            # update the is_trashed
-            instance.is_trash = True
-            # save the record
-            instance.save()
-        # return the response
-        return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
-    except Notess.DoesNotExist as e:
-        return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
+    def delete(self, request, id):
+        try:
+            # get the object of that note_od by passing note_id to the get_object() function
+            instance = self.get_object(id)
+            # check the node is_deleted and is_trashed status Of both are True Then Update Both The Values
+            print(instance)
+            if instance.is_deleted == False:
+                # update the is_deleted
+                instance.is_deleted = True
+                # update the is_trashed
+                instance.is_trash = True
+                # save the record
+                instance.save()
+            # return the response
+            return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
+        except Notess.DoesNotExist as e:
+            return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
 class SetReminder(APIView):
@@ -556,6 +580,11 @@ class SetReminder(APIView):
         except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
+    def get(self, request, id=None):
+        label = self.get_object(id)
+        serializer = LabelSerializer(label).data
+        return Response(serializer)
+
     def put(self, request, id=None):
         """  This handles PUT request to set the reminder to perticular note by note id  """
         result = {
@@ -564,6 +593,7 @@ class SetReminder(APIView):
             "data": []
         }
         logger.info("Enter In The PUT Method Set Reminder API")
+        print("data=========================", request.data)
         data = request.data['reminder']
         print("Data", data)
         try:
@@ -575,7 +605,6 @@ class SetReminder(APIView):
             if not instance:
                 raise Notess.DoesNotExist
             # check note is not trash and not deleted
-            print(instance, "=====================")
             if not instance.is_trash:
                 # update the record and set the reminder
                 instance.reminder = data
@@ -706,6 +735,61 @@ class NotesDocumentViewSet(DocumentViewSet):
         'title': 'title.raw',
         'content': 'content.raw',
     }
+
+
+# collaborator
+class Notecollaborator(APIView):
+    def get_object(self, id=None):
+        obj = Notess.objects.get(id=id)
+        return obj
+
+    def put(self, request, id=None):
+        data = request.data
+        # getting email from input data
+        coll_email = data['collaborate']
+        # user data of given input email
+        coll_user = User.objects.filter(email=coll_email) & User.objects.filter(is_active=1)
+        # user id from collboratoed email
+        user_iid = []
+        for i in coll_user:
+            user_iid.append(i.id)
+
+        my_id = user_iid[0]
+        # object of given note
+        noteinstance = self.get_object(id=id)
+        restoken = redis_methods.get_token(self, 'token')
+        decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+        print("decode token ", decoded_token)
+        dec_id = decoded_token.get('id')
+        print("user id", dec_id)
+        user = User.objects.get(id=dec_id)
+        print("username", user)
+        # checking the collaborated user is in database or not
+        if coll_user:
+            print("data available in database", coll_email)
+            # check if the collaborated user is same or not
+            if user is coll_user:
+                return Response('with same email id can not be collaborate, Please pass the correct email id')
+            else:
+                 noteinstance.collaborate.add(int(my_id))
+        return Response('abc')
+
+
+class getAllUser(APIView):
+    def get(self, request, id=None):
+        user = User.objects.all()
+        print(user)
+        data = User.objects.distinct("email").all()
+        print('data===============>', data)
+        users = []
+        if data:
+            for email in user:
+                users.append(email.email)
+            user_list = users
+            print("email id---------------", user_list)
+        else:
+            return Response('Error ')
+        return Response(user_list)
 
 
 

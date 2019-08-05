@@ -28,7 +28,7 @@ urlpatterns = [
     url(r'^oauth/', include('social_django.urls', namespace='social')),  # <--
     url(r'^swagger/', get_swagger_view(title="API Docs"), name="Docs"),
     path('notes/', views.NoteView.as_view(), name='notes'),
-    path('notesview/<int:id>/', views.NoteDetailView.as_view(), name='notesview'),
+        path('notesview/<int:id>/', views.NoteDetailView.as_view(), name='notesview'),
     path('archieve', views.ArchieveNote.as_view(), name='archieve'),
     path('archieve/<int:id>/', views.ArchieveNote.as_view(), name='archieve'),
     path('reminder/<int:id>/', views.SetReminder.as_view(), name='reminder'),
@@ -38,11 +38,11 @@ urlpatterns = [
     path('labels/<int:id>/', views.LabelDetailView.as_view(), name='labels'),
     path('s3upload/', views.awss3, name='s3upload'),
     path('image_upload/', views.s3_upload, name='image_upload'),
+    path('collaborator/<int:id>/', views.Notecollaborator.as_view(), name='collaborator'),
+    path('user_email/', views.getAllUser.as_view(), name='user'),
+
+
     url('', include(router.urls)),
-
-
-
-
 ]
 
 
