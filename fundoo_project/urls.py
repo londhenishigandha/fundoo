@@ -29,9 +29,10 @@ urlpatterns = [
     url(r'^swagger/', get_swagger_view(title="API Docs"), name="Docs"),
     path('notes/', views.NoteView.as_view(), name='notes'),
         path('notesview/<int:id>/', views.NoteDetailView.as_view(), name='notesview'),
-    path('archieve', views.ArchieveNote.as_view(), name='archieve'),
+    path('archieve/', views.ArchieveNote.as_view(), name='archieve'),
     path('archieve/<int:id>/', views.ArchieveNote.as_view(), name='archieve'),
     path('reminder/<int:id>/', views.SetReminder.as_view(), name='reminder'),
+    path('reminder/', views.ReminderView.as_view(), name='reminder'),
     path('pin/', views.pinNote.as_view(), name='pin'),
     path('trash/', views.TrashView.as_view(), name='trash'),
     path('label/', views.LabelView.as_view(), name='label'),
@@ -40,6 +41,7 @@ urlpatterns = [
     path('image_upload/', views.s3_upload, name='image_upload'),
     path('collaborator/<int:id>/', views.Notecollaborator.as_view(), name='collaborator'),
     path('user_email/', views.getAllUser.as_view(), name='user'),
+    path('addlabel/<int:id>/', views.Addlabels.as_view(), name='addlabel'),
 
 
     url('', include(router.urls)),

@@ -128,7 +128,6 @@ def user_login(request):
                         'email': user.email,
                         'first_name': user.first_name,
                         'last_name': user.last_name,
-                        # 'status_code': 200,
                         'jwt_token': jwt_token
                 }
                 print(result)
@@ -283,16 +282,27 @@ class NoteView(APIView):
         serializer = NoteSerializer(notes, many=True).data
 
         length = len(serializer)
-        print(length, '------------->')
+        # print(length, '------------->')
         my_labels = []
         for index in range(0, length):
             if len(serializer[index]['label']) is not 0:
                 for lb in range(0, len(serializer[index]['label'])):
                     label_id = serializer[index]['label'].pop(lb)
-                    print(serializer[index]['label'])
+                    # print(serializer[index]['label'])
                     label_name = Labels.objects.get(id=label_id).label
-                    print(label_name)
+                    # print(label_name)
                     serializer[index]['label'].insert(0, label_name)
+
+        print(length, '------------->')
+        # for collaborate
+        for index in range(0, length):
+            if len(serializer[index]['collaborate']) is not 0:
+                for lb in range(0, len(serializer[index]['collaborate'])):
+                    label_id = serializer[index]['collaborate'].pop(lb)
+                    print(serializer[index]['collaborate'])
+                    label_name = User.objects.get(id=label_id).email
+                    print(label_name)
+                    serializer[index]['collaborate'].insert(0, label_name)
         r = redis.StrictRedis('localhost')
         mydict = notes
         p_mydict = pickle.dumps(mydict)
@@ -344,6 +354,9 @@ class NoteView(APIView):
         user = User.objects.get(id=dec_id)
         print("username", user)
         serializer = NoteSerializer(data=request.data)
+        print("username", serializer.is_valid())
+        print("username", serializer.errors)
+
         try:
             if serializer.is_valid():
                 serializer.save(created_by=user)
@@ -492,6 +505,13 @@ class TrashView(APIView):
         return Response(serializer, status=200)
 
 
+class ReminderView(APIView):
+    def get(self, request, is_trash=None):
+        trashed_notes = Notess.objects.filter(reminder__isnull=False, is_trash=False).order_by('-id')
+        serializer = NoteSerializer(trashed_notes, many=True).data
+        return Response(serializer, status=200)
+
+
 # to create a label view
 class LabelView(APIView):
 
@@ -572,6 +592,47 @@ class LabelDetailView(APIView):
             return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
+class Addlabels(APIView):
+
+    def get_object(self, id=None):
+        try:
+            a = Labels.objects.get(id=id)
+            return a
+        except Labels.DoesNotExist as e:
+            return Response({"error": "Given object not found."}, status=404)
+
+    def get_noteobject(self, id=None):
+        try:
+            note = Notess.objects.get(id=id)
+            return note
+        except Notess.DoesNotExist as e:
+            return Response({"error": "Given object not found."}, status=404)
+
+    def post(self, request, id=None):
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        print(request.data)
+        label_id = request.data.get('label')
+        print("----------------->", label_id)
+        if not label_id:
+            print("error")
+        else:
+            label_obj = Labels.objects.get(id=label_id)
+            print(label_obj)
+        if not id:
+                print("note id id not valid:")
+        else:
+            note_obj = Notess.objects.get(id=id)
+            print("--------------->", note_obj)
+            note_obj.label.add(label_obj)
+            note_obj.save()
+            print(id)
+            return Response("True", status=200)
+
+
 class SetReminder(APIView):
     def get_object(self, id=None):
         try:
@@ -581,8 +642,8 @@ class SetReminder(APIView):
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
-        label = self.get_object(id)
-        serializer = LabelSerializer(label).data
+        notes = self.get_object(id)
+        serializer = NoteSerializer(notes).data
         return Response(serializer)
 
     def put(self, request, id=None):
@@ -665,7 +726,18 @@ def s3_upload(request):
                 status_code = 400
                 return JsonResponse({'message': message, 'status': status_code})
             else:
-                file_name = 'image'
+                restoken = redis_methods.get_token(self, 'token')
+                print('token id', restoken)
+                # decoding to get user id and username
+                decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+                print('token', decoded_token)
+                decoded_id = decoded_token.get('id')
+                user = User.objects.get(id=decoded_id)
+                print('username:', user)
+                firstname = user.first_name
+                print('name', firstname)
+                file_name = user.first_name+".jpg"
+                print("File=============", file_name)
                 s3_client = boto3.client('s3')
                 s3_client.upload_fileobj(uploaded_file, 'fundoo-bucket', Key=file_name)
                 message = "Image successfully uploaded"
@@ -737,42 +809,113 @@ class NotesDocumentViewSet(DocumentViewSet):
     }
 
 
-# collaborator
+# # collaborator
+# class Notecollaborator(APIView):
+#     def get_object(self, id=None):
+#         obj = Notess.objects.get(id=id)
+#         return obj
+#
+#     def put(self, request, id=None):
+#         data = request.data
+#         # getting email from input data
+#         coll_email = data['collaborate']
+#         # user data of given input email
+#         coll_user = User.objects.filter(email=coll_email) & User.objects.filter(is_active=1)
+#         # user id from collboratoed email
+#         user_iid = []
+#         for i in coll_user:
+#             user_iid.append(i.id)
+#
+#         my_id = user_iid[0]
+#         # object of given note
+#         noteinstance = self.get_object(id=id)
+#         restoken = redis_methods.get_token(self, 'token')
+#         decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+#         print("decode token ", decoded_token)
+#         dec_id = decoded_token.get('id')
+#         print("user id", dec_id)
+#         user = User.objects.get(id=dec_id)
+#         print("username", user)
+#         # checking the collaborated user is in database or not
+#         if coll_user:
+#             print("data available in database", coll_email)
+#             # check if the collaborated user is same or not
+#             if user is coll_user:
+#                 return Response('with same email id can not be collaborate, Please pass the correct email id')
+#             else:
+#                  noteinstance.collaborate.add(int(my_id))
+#         return Response('abc')
+
 class Notecollaborator(APIView):
     def get_object(self, id=None):
         obj = Notess.objects.get(id=id)
         return obj
 
     def put(self, request, id=None):
-        data = request.data
-        # getting email from input data
-        coll_email = data['collaborate']
-        # user data of given input email
-        coll_user = User.objects.filter(email=coll_email) & User.objects.filter(is_active=1)
-        # user id from collboratoed email
-        user_iid = []
-        for i in coll_user:
-            user_iid.append(i.id)
-
-        my_id = user_iid[0]
-        # object of given note
+        """ This handles PUT request to collaborate particular note by note id """
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        logger.info("Enter In The PUT Method collaborate API")
+        colobrate_data = request.data
+        collaborator_email = colobrate_data['collaborate']
+        collaborate_user = User.objects.filter(email=collaborator_email) & User.objects.filter(is_active=1)
+        print("collaborate user", collaborate_user)
+        user_id = []
+        for i in collaborate_user:
+            user_id.append(i.id)
+        collaborate_id = user_id[0]
         noteinstance = self.get_object(id=id)
-        restoken = redis_methods.get_token(self, 'token')
-        decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
-        print("decode token ", decoded_token)
-        dec_id = decoded_token.get('id')
-        print("user id", dec_id)
-        user = User.objects.get(id=dec_id)
-        print("username", user)
-        # checking the collaborated user is in database or not
-        if coll_user:
-            print("data available in database", coll_email)
-            # check if the collaborated user is same or not
-            if user is coll_user:
-                return Response('with same email id can not be collaborate, Please pass the correct email id')
+        try:
+            if not id:
+                raise ValueError
+            logger.debug("Enter In The Try Block")
+            restoken = redis_methods.get_token(self, 'token')
+            # decoding to get user id and username
+            decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+            decoded_id = decoded_token.get('id')
+            decoded_email = decoded_token.get('email')
+            user = User.objects.get(id=decoded_id)
+            if collaborator_email:
+                print("data available in database", collaborator_email)
+                if collaborator_email is decoded_email:
+                    return Response('with same email idd can not be collaborate, Please pass the correct email id')
+                else:
+                    noteinstance.collaborate.add(int(collaborate_id))
+                    noteinstance.save()
+                    current_site = get_current_site(request)
+                    # creating mail body
+                    mail_subject = 'Check collaborated note'
+                    message = render_to_string("collaborate_email.html", {
+                        'user': user,
+                        'domain': current_site.domain,
+                    })
+                    to_email = collaborator_email
+                    email = EmailMessage(
+                        mail_subject, message, to=[to_email]
+                    )
+                    print("llllllllll", email)
+                    email.send()
+                    result["message"] = "Please check your email address to get the collaborated note"
+                    result["success"] = True
+                    result["data"] = colobrate_data
+                    logger.debug("Return The Response To The Browser..")
+                    return Response(result, status=200)
             else:
-                 noteinstance.collaborate.add(int(my_id))
-        return Response('abc')
+                result["message"] = "User not found"
+                result["success"] = True
+                result["data"] = colobrate_data
+                return Response(result, status=404)
+        except ValueError as e:
+            result["Message"] = "Note id cant blank"
+            logger.debug("Return The Response To The Browser..")
+            return Response(result, status=204)
+        except Notess.DoesNotExist as e:
+            result["message"] = "No record found for note id "
+            logger.debug("Return The Response To The Browser..")
+        return Response(result, status=200)
 
 
 class getAllUser(APIView):
@@ -786,7 +929,7 @@ class getAllUser(APIView):
             for email in user:
                 users.append(email.email)
             user_list = users
-            print("email id---------------", user_list)
+            print("email id---------------", user_list,)
         else:
             return Response('Error ')
         return Response(user_list)
