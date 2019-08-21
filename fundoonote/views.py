@@ -36,11 +36,6 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
 from rest_framework.permissions import AllowAny
-from rest_framework.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-    HTTP_200_OK
-)
 from rest_framework.response import Response
 
 from django_elasticsearch_dsl_drf.constants import (
@@ -79,34 +74,21 @@ def user_logout(request):
 
 @csrf_exempt
 def user_login(request):
-
     # print(request.data)
     request_data = json.loads((request.body).decode('utf-8'))
-    # request_data=eval(request_data1)
-    # print(request_data1)
-
-    # import ast
-    # request_data=ast.literal_eval(request_data1)
-
     print(type(request_data), '------------>')
     print(request_data)
-
     if request.method == 'POST':
         # username = request.POST.get('username')
         username = request_data['username']
-
         print(username, '---------------->')
         # password = request.POST.get('password')
         password = request_data['password']
-
         print(password, '------------>')
-
         # authenticate the user n password
         user = authenticate(username=username, password=password)
-
         # check if user details is valid or not
         if user:
-
             if user.is_active:
                 payload = {
                     'id': user.id,
@@ -137,7 +119,6 @@ def user_login(request):
                 message = "Your account was inactive."
                 status_code = 400
                 return JsonResponse({'message': message, 'status': status_code})
-
         else:
             print("Someone tried to login and failed.")
             print("They used username: {} and password: {}".format(username, password))
@@ -150,8 +131,8 @@ def user_login(request):
 
 class RegisterView(APIView):
     serializer_class = RegisterSerializer
-    def post(self, request):
 
+    def post(self, request):
         redis = redis_methods()
         serializer = RegisterSerializer(data=request.data)
         print("Serializers", serializer)
@@ -244,11 +225,9 @@ def forgot_pass_activate(request, uidb64, token):
 
 @csrf_exempt
 def confirm(request, uidb64, token):
-
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
-
         print(user)
     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
@@ -276,11 +255,11 @@ class NoteView(APIView):
         # decodes the jwt token and gets the value of user details
         user_id = decoded_token.get('id')
         user = User.objects.get(id=user_id)
-        print("Name of the user: ", user)
-        notes = Notess.objects.filter(is_trash=False, created_by=user).order_by('id')
+        # print("Name of the user: ", user)
+        notes = Notess.objects.filter(is_trash=False, created_by=user, is_archive=False, is_pin=False).order_by('id')
+        # print("note", notes)
         # labels= Labels.objects.filter(id=user_id)
         serializer = NoteSerializer(notes, many=True).data
-
         length = len(serializer)
         # print(length, '------------->')
         my_labels = []
@@ -292,8 +271,7 @@ class NoteView(APIView):
                     label_name = Labels.objects.get(id=label_id).label
                     # print(label_name)
                     serializer[index]['label'].insert(0, label_name)
-
-        print(length, '------------->')
+        # print(length, '------------->')
         # for collaborate
         for index in range(0, length):
             if len(serializer[index]['collaborate']) is not 0:
@@ -327,7 +305,7 @@ class NoteView(APIView):
     #         user = User.objects.get(id=dec_id)
     #         serializer = NoteSerializer(data=data)
     #         print(serializer)
-    #         print(serializer.is_valid())
+    #         print(serializer.is_valid())  
     #         if serializer.is_valid(raise_exception=True):
     #             serializer.save(created_by=user)
     #             result["message"] = "Note created successfully "
@@ -354,9 +332,9 @@ class NoteView(APIView):
         user = User.objects.get(id=dec_id)
         print("username", user)
         serializer = NoteSerializer(data=request.data)
+        print("dataaaa", serializer)
         print("username", serializer.is_valid())
         print("username", serializer.errors)
-
         try:
             if serializer.is_valid():
                 serializer.save(created_by=user)
@@ -413,6 +391,14 @@ class NoteDetailView(APIView):
 
 
 # To Archieve the note
+class ArchiveGetNotes(APIView):
+
+    def get(self, request):
+        notes = Notess.objects.filter(is_archive=True)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
+
+
 class ArchieveNote(APIView):
 
     def get_object(self, id=None):
@@ -422,8 +408,8 @@ class ArchieveNote(APIView):
         except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
-    def get(self, request):
-        notes = Notess.objects.filter(is_archive=True)
+    def get(self, request, id=None):
+        notes = Notess.objects.filter(is_archive=True, id=id)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
@@ -446,7 +432,7 @@ class ArchieveNote(APIView):
             if not instance:
                 raise Notess.DoesNotExist
             # check note is not trash and not deleted
-            print(instance, "=====================")
+            # print(instance, "=====================")
             if not instance.is_archive:
                 # update the record and set the archive
                 instance.is_archive = data
@@ -468,33 +454,222 @@ class ArchieveNote(APIView):
         return Response(result, status=204)
 
 
+class UnArchiveGetNotes(APIView):
+
+    def get(self, request):
+        notes = Notess.objects.fUnArchieveNoteilter(is_archive=False)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
+
+
+class UnArchieveNote(APIView):
+
+    def get_object(self, id=None):
+        try:
+            a = Notess.objects.get(id=id)
+            return a
+        except Notess.DoesNotExist as e:
+            return Response({"error": "Given object not found."}, status=404)
+
+    def get(self, request, id=None):
+        notes = Notess.objects.filter(is_archive=False, id=id)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
+
+    def put(self, request, id=None):
+        """  This handles PUT request to achieve particular note by note id  """
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        logger.info("Enter In The PUT Method Set archive API")
+        data = request.data['is_archive']
+        print("Data", data)
+        try:
+            if not id:
+                raise ValueError
+            logger.debug("Enter In The Try Block")
+            # get the note object by passing the note id
+            instance = self.get_object(id)
+            if not instance:
+                raise Notess.DoesNotExist
+            # check note is not trash and not deleted
+            # print(instance, "=====================")
+            if not instance.is_archive:
+                # update the record and set the archive
+                instance.is_archive = False
+                instance.save()
+                # return the success message and archive data
+                result["message"] = "UnArchive Set Successfully"
+                result["success"] = True
+                result["data"] = data
+                logger.debug("Return The Response To The Browser..")
+                return Response(result, status=200)
+        # except the exception and return the response
+        except ValueError as e:
+            result["Message"] = "Note id cant blank"
+            logger.debug("Return The Response To The Browser..")
+            return Response(result, status=204)
+        except Notess.DoesNotExist as e:
+            result["message"] = "No record found for note id "
+            logger.debug("Return The Response To The Browser..")
+        return Response(result, status=204)
+
+
+class PinGetNotes(APIView):
+
+    def get(self, request):
+        notes = Notess.objects.filter(is_pin=True)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
+
+
 # To pin
 class pinNote(APIView):
 
     def get_object(self, id=None):
         try:
-            return Notess.object.get(id=id)
+            return Notess.objects.get(id=id)
         except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def put(self, request, id=None):
-        data = request.data
-        instance = self.get_object(id)
-        serializer = NoteSerializer(instance, data=data)
-        notes = Notess.objects.all()
+        """  This handles PUT request to pin particular note by note id  """
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        logger.info("Enter In The PUT Method Set archive API")
+        data = request.data['is_pin']
+        print("Data", data)
         try:
-            if serializer.is_valid():
-                if notes.is_pin == False or None:
-                    notes.is_pin = True
-                    notes.save()
-                else:
-                    return Response("Already pin")
-                return Response("pin is set")
-            else:
-                serializer.save()
-        except serializers.ValidationError:
-            return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return JsonResponse(serializer.data, status=200)
+            if not id:
+                raise ValueError
+            logger.debug("Enter In The Try Block")
+            # get the note object by passing the note id
+            instance = self.get_object(id)
+            if not instance:
+                raise Notess.DoesNotExist
+            # check note is not trash and not deleted
+            # print(instance, "=====================")
+            if not instance.is_pin:
+                # update the record and set the archive
+                instance.is_pin = data
+                instance.save()
+                # return the success message and archive data
+                result["message"] = "pin Successfully"
+                result["success"] = True
+                result["data"] = data
+                logger.debug("Return The Response To The Browser..")
+                return Response(result, status=200)
+        # except the exception and return the response
+        except ValueError as e:
+            result["Message"] = "Note id cant blank"
+            logger.debug("Return The Response To The Browser..")
+            return Response(result, status=204)
+        except Notess.DoesNotExist as e:
+            result["message"] = "No record found for note id "
+            logger.debug("Return The Response To The Browser..")
+        return Response(result, status=204)
+
+
+class UnPinGetNotes(APIView):
+
+    def get(self, request):
+        notes = Notess.objects.filter(is_pin=False)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
+
+
+class PinnedNotes(APIView):
+
+    def get(self, request, id=None):
+        notes = Notess.objects.filter(is_pin=True)
+        # serializer = NoteSerializer(notes, many=True).data
+        # notes = Notess.objects.filter(is_trash=False, created_by=user, is_archive=False, is_pin=False).order_by('id')
+
+        # labels= Labels.objects.filter(id=user_id)
+        serializer = NoteSerializer(notes, many=True).data
+        # print("note==========", serializer)
+        length = len(serializer)
+        # print(length, '------------->')
+        my_labels = []
+        for index in range(0, length):
+            if len(serializer[index]['label']) is not 0:
+                for lb in range(0, len(serializer[index]['label'])):
+                    label_id = serializer[index]['label'].pop(lb)
+                    # print(serializer[index]['label'])
+                    label_name = Labels.objects.get(id=label_id).label
+                    # print(label_name)
+                    serializer[index]['label'].insert(0, label_name)
+        # print(length, '------------->')
+        # for collaborate
+        for index in range(0, length):
+            if len(serializer[index]['collaborate']) is not 0:
+                for lb in range(0, len(serializer[index]['collaborate'])):
+                    label_id = serializer[index]['collaborate'].pop(lb)
+                    print(serializer[index]['collaborate'])
+                    label_name = User.objects.get(id=label_id).email
+                    print(label_name)
+                    serializer[index]['collaborate'].insert(0, label_name)
+        return Response(serializer, status=200)
+
+
+# To pin
+class UnpinNote(APIView):
+
+    def get_object(self, id=None):
+        try:
+            return Notess.objects.get(id=id)
+        except Notess.DoesNotExist as e:
+            return Response({"error": "Given object not found."}, status=404)
+
+    def get(self, request, id=None):
+        notes = Notess.objects.filter(is_pin=False, id=id)
+        serializer = NoteSerializer(notes, many=True).data
+        return Response(serializer, status=200)
+
+    def put(self, request, id=None):
+        """  This handles PUT request to pin particular note by note id  """
+        result = {
+            "message": "Something bad happened",
+            "success": False,
+            "data": []
+        }
+        logger.info("Enter In The PUT Method Set archive API")
+        data = request.data['is_pin']
+        print("Data", data)
+        try:
+            if not id:
+                raise ValueError
+            logger.debug("Enter In The Try Block")
+            # get the note object by passing the note id
+            instance = self.get_object(id)
+            if not instance:
+                raise Notess.DoesNotExist
+            # check note is not trash and not deleted
+            print(instance, "=====================")
+            if not instance.is_pin:
+                # update the record and set the archive
+                instance.is_pin = data
+                instance.save()
+                # return the success message and archive data
+                result["message"] = "Unpin Successfully"
+                result["success"] = True
+                result["data"] = data
+                logger.debug("Return The Response To The Browser..")
+                return Response(result, status=200)
+        # except the exception and return the response
+        except ValueError as e:
+            result["Message"] = "Note id cant blank"
+            logger.debug("Return The Response To The Browser..")
+            return Response(result, status=204)
+        except Notess.DoesNotExist as e:
+            result["message"] = "No record found for note id "
+            logger.debug("Return The Response To The Browser..")
+        return Response(result, status=204)
 
 
 # for trash
@@ -516,20 +691,14 @@ class ReminderView(APIView):
 class LabelView(APIView):
 
     def get(self, request):
-
         label = Labels.objects.filter(is_deleted=False)
         serializer = LabelSerializer(label, many=True).data
-
-        print('serializer----<>', serializer)
-
+        # print('serializer----<>', serializer)
         length = len(serializer)
         my_labels = []
         for index in range(0, length):
-
             my_labels.append(serializer[index]['label'])
-
-        print(my_labels)
-
+        # print(my_labels)
         return Response(serializer, status=200)
 
     def post(self, request):
@@ -608,6 +777,11 @@ class Addlabels(APIView):
         except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
+    def get(self, request, id=None):
+        label = self.get_object(id)
+        serializer = LabelSerializer(label).data
+        return Response(serializer)
+
     def post(self, request, id=None):
         result = {
             "message": "Something bad happened",
@@ -631,6 +805,20 @@ class Addlabels(APIView):
             note_obj.save()
             print(id)
             return Response("True", status=200)
+
+
+class DeleteLabel(APIView):
+
+    def put(self, request, id=None):
+        print(request.data)
+        labelname = request.data.get('label')
+        label_obj = Labels.objects.get(label=labelname)
+        note_obj = Notess.objects.get(id=id)
+
+        print(label_obj, note_obj, id, labelname)
+        if note_obj and label_obj:
+            note_obj.label.remove(label_obj.id)
+        return Response("Label Deleted", status=200)
 
 
 class SetReminder(APIView):
@@ -707,7 +895,6 @@ def awss3(request):
                     else:
                         transfer.upload_file(local_path, bucket, s3_path)
             return HttpResponse("Image is Upload")
-
     except Exception as e:
         return e
 
@@ -809,43 +996,6 @@ class NotesDocumentViewSet(DocumentViewSet):
     }
 
 
-# # collaborator
-# class Notecollaborator(APIView):
-#     def get_object(self, id=None):
-#         obj = Notess.objects.get(id=id)
-#         return obj
-#
-#     def put(self, request, id=None):
-#         data = request.data
-#         # getting email from input data
-#         coll_email = data['collaborate']
-#         # user data of given input email
-#         coll_user = User.objects.filter(email=coll_email) & User.objects.filter(is_active=1)
-#         # user id from collboratoed email
-#         user_iid = []
-#         for i in coll_user:
-#             user_iid.append(i.id)
-#
-#         my_id = user_iid[0]
-#         # object of given note
-#         noteinstance = self.get_object(id=id)
-#         restoken = redis_methods.get_token(self, 'token')
-#         decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
-#         print("decode token ", decoded_token)
-#         dec_id = decoded_token.get('id')
-#         print("user id", dec_id)
-#         user = User.objects.get(id=dec_id)
-#         print("username", user)
-#         # checking the collaborated user is in database or not
-#         if coll_user:
-#             print("data available in database", coll_email)
-#             # check if the collaborated user is same or not
-#             if user is coll_user:
-#                 return Response('with same email id can not be collaborate, Please pass the correct email id')
-#             else:
-#                  noteinstance.collaborate.add(int(my_id))
-#         return Response('abc')
-
 class Notecollaborator(APIView):
     def get_object(self, id=None):
         obj = Notess.objects.get(id=id)
@@ -862,7 +1012,7 @@ class Notecollaborator(APIView):
         colobrate_data = request.data
         collaborator_email = colobrate_data['collaborate']
         collaborate_user = User.objects.filter(email=collaborator_email) & User.objects.filter(is_active=1)
-        print("collaborate user", collaborate_user)
+        # print("collaborate user", collaborate_user)
         user_id = []
         for i in collaborate_user:
             user_id.append(i.id)
@@ -896,7 +1046,7 @@ class Notecollaborator(APIView):
                     email = EmailMessage(
                         mail_subject, message, to=[to_email]
                     )
-                    print("llllllllll", email)
+                    print("email", email)
                     email.send()
                     result["message"] = "Please check your email address to get the collaborated note"
                     result["success"] = True
@@ -918,20 +1068,37 @@ class Notecollaborator(APIView):
         return Response(result, status=200)
 
 
+class DeleteCollaborator(APIView):
+
+    def put(self, request, id=None):
+        print(request.data)
+        collaborator_email = request.data.get('collaborate')
+        print("usersssssss",collaborator_email)
+        note_obj = Notess.objects.get(id=id)
+        print("-------------->", note_obj)
+        user_obj = User.objects.get(collaborate=collaborator_email)
+        print(user_obj, note_obj, id, collaborator_email)
+        if note_obj and user_obj:
+            note_obj.collaborate.remove(user_obj.id)
+        return Response("collaborator Deleted", status=200)
+
+
 class getAllUser(APIView):
     def get(self, request, id=None):
         user = User.objects.all()
-        print(user)
+        # print(user)
         data = User.objects.distinct("email").all()
-        print('data===============>', data)
+        # print('data===============>', data)
+        collaborate_user = User.objects.all() & User.objects.filter(is_active=1)
+        # print("users", collaborate_user)
         users = []
         if data:
             for email in user:
                 users.append(email.email)
             user_list = users
-            print("email id---------------", user_list,)
+            # print("email id---------------", user_list,)
         else:
-            return Response('Error ')
+            return Response('Error')
         return Response(user_list)
 
 

@@ -15,7 +15,6 @@ class redis_methods:
         token = r.get(key)
         return token
 
-
     def flush(self):
         # this method is used to delete data from redis
         r.flushall()
