@@ -50,6 +50,9 @@ from django_elasticsearch_dsl_drf.filter_backends import (
 )
 from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
 
+from fundoonote import documents as documents
+from fundoonote import serializers as articles_serializers
+
 
 def index(request):
     return render(request, 'fundoonote/index.html')
