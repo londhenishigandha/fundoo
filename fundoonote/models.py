@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.auth.models import (BaseUserManager, AbstractBaseUser)
+from django.conf import settings
+User = settings.AUTH_USER_MODEL
 
 
 # User profile form
@@ -48,5 +50,4 @@ class Mapping(models.Model):
 
     def __str__(self):
         return self.title
-
 

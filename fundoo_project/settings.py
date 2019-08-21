@@ -61,6 +61,9 @@ INSTALLED_APPS = [
     'corsheaders'
 ]
 
+# custom user model
+# AUTH_USER_MODEL = 'fundoonote.AccountManager'
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -259,3 +262,4 @@ CELERY_TASK_ALWAYS_EAGER = True
 # logger
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('This will get logged')
+

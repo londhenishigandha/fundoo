@@ -37,7 +37,6 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-
 from django_elasticsearch_dsl_drf.constants import (
     LOOKUP_FILTER_RANGE,
     LOOKUP_QUERY_IN,
@@ -1100,6 +1099,5 @@ class getAllUser(APIView):
         else:
             return Response('Error')
         return Response(user_list)
-
 
 
