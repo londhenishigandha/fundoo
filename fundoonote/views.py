@@ -4,11 +4,6 @@ import pickle
 import redis
 from boto3.s3.transfer import S3Transfer
 import logging
-from django.utils.decorators import method_decorator
-from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.generics import CreateAPIView
-from rest_framework.response import Response
 import self as self
 from .decorators import my_login_required
 from .documents import NotesDocument
