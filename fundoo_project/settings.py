@@ -130,11 +130,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-WEBPUSH_SETTINGS = {
-   "VAPID_PUBLIC_KEY": "BDp1yxiN_Q-nRY2tyjotejESsp2V8Vop-BG4INxinpYI8i2_SZL7eGpBOXBMcD6L0VUZsqDZn9YrR55reh90IG8",
-   "VAPID_PRIVATE_KEY": "JnuCdR5G6qofJIxaCNOfg1IM-2C4Ikeq8rYmZ5UPjuI",
-   "VAPID_ADMIN_EMAIL": "londhenishigandha123@gmail.com"
-}
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
@@ -214,8 +210,7 @@ SOCIAL_AUTH_FACEBOOK_SECRET = os.getenv("SOCIAL_AUTH_FACEBOOK_SECRET")  # App Se
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'fundoonote/static'),
 ]
-# AWS_ACCESS_KEY_ID = 'AKIAU6YF2KSOPYML3SMB'
-# AWS_SECRET_ACCESS_KEY = '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'
+
 # AWS_STORAGE_BUCKET_NAME = 'fundoonote-bucket'
 # AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 #
