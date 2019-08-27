@@ -84,7 +84,8 @@ urlpatterns = [
 
     # collaborator
     path('collaborator/<int:id>/', views.Notecollaborator.as_view(), name='collaborator'),
-    path('deletecollaborator/<int:id>/', views.DeleteCollaborator.as_view(), name='deletecollaborator'),
+    # path('deletecollaborator/<int:id>/', views.DeleteCollaborator.as_view(), name='deletecollaborator'),
+    path('deletecollab/<int:id>/', views.Collaborator.as_view(), name='deletecollab'),
 
     # get all user through email id
     path('user_email/', views.getAllUser.as_view(), name='user'),

@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from .models import Account
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -16,18 +17,18 @@ from .documents import NotesDocument
 
 class RegisterSerializer(serializers.ModelSerializer):
 
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
-    email = serializers.EmailField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
-    username = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all())])
+    firstname = serializers.CharField(required=False)
+    lastname = serializers.CharField(required=False)
+    email = serializers.EmailField(required=True, validators=[UniqueValidator(queryset=Account.objects.all())])
+    username = serializers.CharField(validators=[UniqueValidator(queryset=Account.objects.all())])
     password = serializers.CharField(min_length=8)
 
     class Meta:
-        model = User
-        fields = ('first_name', 'last_name', 'email', 'username', 'password',)
+        model = Account
+        fields = ('firstname', 'lastname', 'email', 'username', 'password',)
 
     def create(self, validated_data):
-        user = User.objects.create(**validated_data)
+        user = Account.objects.create(**validated_data)
         user.is_active = False
         user.set_password(user.password)
         user.save()

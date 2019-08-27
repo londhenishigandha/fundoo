@@ -1,7 +1,7 @@
 import jwt
 from django.http import HttpResponse
 from self import self
-from .models import User
+from .models import Account
 from .service import redis_methods
 
 
@@ -15,7 +15,7 @@ def my_login_required(function):
         # decodes the jwt token and gets the value of user details
         # print("TOKEN DECODE", decoded_token)
         user_id = decoded_token.get('id')
-        user = User.objects.get(id=user_id)
+        user = Account.objects.get(id=user_id)
         print("user name", user)
         if user:
             # if it is present then go to next stp

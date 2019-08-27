@@ -46,7 +46,8 @@ from django_elasticsearch_dsl_drf.filter_backends import (
     DefaultOrderingFilterBackend,
     CompoundSearchFilterBackend, FunctionalSuggesterFilterBackend)
 from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
-
+from .models import Account
+from fundoonote.services.Service import Service
 logger = logging.getLogger(__name__)
 
 
@@ -64,7 +65,6 @@ def user_logout(request):
     logout(request)
     redis_methods.flush(self)
     return HttpResponseRedirect(reverse('index'))
-
 
 @csrf_exempt
 def user_login(request):
@@ -102,8 +102,8 @@ def user_login(request):
                         'username': user.username,
                         'password': user.password,
                         'email': user.email,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
+                        'first_name': user.firstname,
+                        'last_name': user.lastname,
                         'jwt_token': jwt_token
                 }
                 print(result)
@@ -158,9 +158,9 @@ class RegisterView(APIView):
 def activate(request, uidb64, token):
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
-        user = User.objects.get(pk=uid)
+        user = Account.objects.get(pk=uid)
         print(user)
-    except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+    except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
@@ -179,7 +179,7 @@ class Forgot(APIView):
         print(email)
         domain = "localhost:3000/confirm"
         if email:
-            user = User.objects.get(email=email)
+            user = Account.objects.get(email=email)
             print(user)
             current_site = get_current_site(request)
             mail_subject = "Reset your password"
@@ -197,15 +197,15 @@ class Forgot(APIView):
             return HttpResponse('Please confirm your email address to complete the registration')
             # return HttpResponse({"asda": "Mail Send Success Check Link"})
         else:
-            return HttpResponse({"asda": "Fail"})
+            return HttpResponse({"abc": "Fail"})
 
 
 @csrf_exempt
 def forgot_pass_activate(request, uidb64, token):
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
-        user = User.objects.get(pk=uid)
-    except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = Account.objects.get(pk=uid)
+    except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
@@ -221,9 +221,9 @@ def forgot_pass_activate(request, uidb64, token):
 def confirm(request, uidb64, token):
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
-        user = User.objects.get(pk=uid)
+        user = Account.objects.get(pk=uid)
         print(user)
-    except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+    except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
         user.setpassword = True
@@ -248,7 +248,7 @@ class NoteView(APIView):
         decoded_token = jwt.decode(redistoken, 'secret', algorithms=['HS256'])
         # decodes the jwt token and gets the value of user details
         user_id = decoded_token.get('id')
-        user = User.objects.get(id=user_id)
+        user = Account.objects.get(id=user_id)
         # print("Name of the user: ", user)
         notes = Notess.objects.filter(is_trash=False, created_by=user, is_archive=False, is_pin=False).order_by('id')
         # print("note", notes)
@@ -272,7 +272,7 @@ class NoteView(APIView):
                 for lb in range(0, len(serializer[index]['collaborate'])):
                     label_id = serializer[index]['collaborate'].pop(lb)
                     print(serializer[index]['collaborate'])
-                    label_name = User.objects.get(id=label_id).email
+                    label_name = Account.objects.get(id=label_id).email
                     print(label_name)
                     serializer[index]['collaborate'].insert(0, label_name)
         r = redis.StrictRedis('localhost')
@@ -285,50 +285,18 @@ class NoteView(APIView):
 
         return Response(serializer, status=200)
 
-    # def post(self, request):
-    #     result = {"message": "something bad happened",  # give the element in rest api
-    #               "success": False,
-    #               "data": {}}
-    #     try:
-    #         restoken = redis_methods.get_token(self, 'token')
-    #         decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
-    #         print("decode token ", decoded_token)
-    #         dec_id = decoded_token.get('id')
-    #         print("user id", dec_id)
-    #         data = request.data
-    #         user = User.objects.get(id=dec_id)
-    #         serializer = NoteSerializer(data=data)
-    #         print(serializer)
-    #         print(serializer.is_valid())  
-    #         if serializer.is_valid(raise_exception=True):
-    #             serializer.save(created_by=user)
-    #             result["message"] = "Note created successfully "
-    #             result['success'] = True
-    #             result["data"] = serializer.data
-    #             result['mail'] = "mail send successfully"
-    #             notes = json.dump(result)
-    #             for i in serializer.data['collaborate']:
-    #                 user = User.objects.get(id=i)
-    #                 print(i)
-    #                 if user:
-    #                     send_mail('Subject here', notes, request.user.email, [str(user.email)], fail_silently=False)
-    #
-    #         return Response(result, status=200)
-    #     except:
-    #         return Response(result, status=400)
-
     def post(self, request):
         restoken = redis_methods.get_token(self, 'token')
         decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
         print("decode token ", decoded_token)
         dec_id = decoded_token.get('id')
         print("user id", dec_id)
-        user = User.objects.get(id=dec_id)
+        user = Account.objects.get(id=dec_id)
         print("username", user)
         serializer = NoteSerializer(data=request.data)
         print("dataaaa", serializer)
         print("username", serializer.is_valid())
-        print("username", serializer.errors)
+        print("username...", serializer.errors)
         try:
             if serializer.is_valid():
                 serializer.save(created_by=user)
@@ -465,7 +433,7 @@ class UnArchieveNote(APIView):
         except Notess.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
-    def get(self, request, id=None):
+    def get(self, id=None):
         notes = Notess.objects.filter(is_archive=False, id=id)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
@@ -605,7 +573,7 @@ class PinnedNotes(APIView):
                 for lb in range(0, len(serializer[index]['collaborate'])):
                     label_id = serializer[index]['collaborate'].pop(lb)
                     print(serializer[index]['collaborate'])
-                    label_name = User.objects.get(id=label_id).email
+                    label_name = Account.objects.get(id=label_id).email
                     print(label_name)
                     serializer[index]['collaborate'].insert(0, label_name)
         return Response(serializer, status=200)
@@ -913,11 +881,11 @@ def s3_upload(request):
                 decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
                 print('token', decoded_token)
                 decoded_id = decoded_token.get('id')
-                user = User.objects.get(id=decoded_id)
+                user = Account.objects.get(id=decoded_id)
                 print('username:', user)
-                firstname = user.first_name
+                firstname = user.firstname
                 print('name', firstname)
-                file_name = user.first_name+".jpg"
+                file_name = user.firstname+".jpg"
                 print("File=============", file_name)
                 s3_client = boto3.client('s3')
                 s3_client.upload_fileobj(uploaded_file, 'fundoo-bucket', Key=file_name)
@@ -991,6 +959,7 @@ class NotesDocumentViewSet(DocumentViewSet):
 
 
 class Notecollaborator(APIView):
+
     def get_object(self, id=None):
         obj = Notess.objects.get(id=id)
         return obj
@@ -1005,7 +974,7 @@ class Notecollaborator(APIView):
         logger.info("Enter In The PUT Method collaborate API")
         colobrate_data = request.data
         collaborator_email = colobrate_data['collaborate']
-        collaborate_user = User.objects.filter(email=collaborator_email) & User.objects.filter(is_active=1)
+        collaborate_user = Account.objects.filter(email=collaborator_email) & Account.objects.filter(is_active=1)
         # print("collaborate user", collaborate_user)
         user_id = []
         for i in collaborate_user:
@@ -1021,11 +990,11 @@ class Notecollaborator(APIView):
             decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
             decoded_id = decoded_token.get('id')
             decoded_email = decoded_token.get('email')
-            user = User.objects.get(id=decoded_id)
+            user = Account.objects.get(id=decoded_id)
             if collaborator_email:
-                print("data available in database", collaborator_email)
+                # print("data available in database", collaborator_email)
                 if collaborator_email is decoded_email:
-                    return Response('with same email idd can not be collaborate, Please pass the correct email id')
+                    return Response('with same email id can not be collaborate, Please pass the correct email id')
                 else:
                     noteinstance.collaborate.add(int(collaborate_id))
                     noteinstance.save()
@@ -1062,37 +1031,57 @@ class Notecollaborator(APIView):
         return Response(result, status=200)
 
 
-class DeleteCollaborator(APIView):
+class Collaborator(APIView):
 
     def put(self, request, id=None):
+        res = {}
+        serv_obj = Service()
         print(request.data)
         collaborator_email = request.data.get('collaborate')
-        print("usersssssss",collaborator_email)
-        note_obj = Notess.objects.get(id=id)
-        print("-------------->", note_obj)
-        user_obj = User.objects.get(collaborate=collaborator_email)
-        print(user_obj, note_obj, id, collaborator_email)
-        if note_obj and user_obj:
-            note_obj.collaborate.remove(user_obj.id)
+        if not collaborator_email:
+            res['msg'] = "Email is required"
+            return Response(res, status=200)
+        serv_obj.collaborate(collaborator_email, id)
         return Response("collaborator Deleted", status=200)
+
+
+class AddCollab(APIView):
+
+    def post(self, request, note_id=None):
+        res = {
+            'message':'',
+            'success': False
+        }
+        try:
+            service_obj = Service()
+            if not note_id:
+                raise ValueError("Note is is required")
+            collaborator_email = request.data.get('collaborate')
+            if not collaborator_email:
+                raise ValueError("Email is required")
+
+            if service_obj.collaborator(collaborator_email, note_id):
+                res['message'] = "Note Collaborated.."
+                res['success'] = True
+                return Response(res, status=200)
+            else:
+                res['message'] = "failed"
+        except Exception as e:
+            print(e)
+
+        return Response(res, status=400)
 
 
 class getAllUser(APIView):
     def get(self, request, id=None):
-        user = User.objects.all()
-        # print(user)
-        data = User.objects.distinct("email").all()
-        # print('data===============>', data)
-        collaborate_user = User.objects.all() & User.objects.filter(is_active=1)
-        # print("users", collaborate_user)
+        user = Account.objects.all()
+        data = Account.objects.distinct("email").all()
+        collaborate_user = Account.objects.all() & Account.objects.filter(is_active=1)
         users = []
         if data:
             for email in user:
                 users.append(email.email)
             user_list = users
-            # print("email id---------------", user_list,)
         else:
             return Response('Error')
         return Response(user_list)
-
-

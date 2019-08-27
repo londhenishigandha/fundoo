@@ -32,7 +32,7 @@ MEDIA_DIR = os.path.join(BASE_DIR, 'media')
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'c5fs*wck!$!lj)epgvwhqg5m6gizgi=#@2_mba#7vr!tr6+64q'
+SECRET_KEY =os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -62,7 +62,7 @@ INSTALLED_APPS = [
 ]
 
 # custom user model
-# AUTH_USER_MODEL = 'fundoonote.AccountManager'
+AUTH_USER_MODEL = 'fundoonote.Account'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -141,12 +141,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-#
-# WEBPUSH_SETTINGS = {
-#    "VAPID_PUBLIC_KEY": "BDp1yxiN_Q-nRY2tyjotejESsp2V8Vop-BG4INxinpYI8i2_SZL7eGpBOXBMcD6L0VUZsqDZn9YrR55reh90IG8",
-#    "VAPID_PRIVATE_KEY": "JnuCdR5G6qofJIxaCNOfg1IM-2C4Ikeq8rYmZ5UPjuI",
-#    "VAPID_ADMIN_EMAIL": "londhenishigandha123@gmail.com"
-# }
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
@@ -175,7 +169,6 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [STATIC_DIR]
 MEDIA_ROOT = MEDIA_DIR
 
-# Email
 # EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
 # EMAIL_FILE_PATH = os.path.join(BASE_DIR, "sent_emails")
 
@@ -226,8 +219,7 @@ SOCIAL_AUTH_FACEBOOK_SECRET = os.getenv("SOCIAL_AUTH_FACEBOOK_SECRET")  # App Se
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'fundoonote/static'),
 ]
-# AWS_ACCESS_KEY_ID = 'AKIAU6YF2KSOPYML3SMB'
-# AWS_SECRET_ACCESS_KEY = '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'
+
 # AWS_STORAGE_BUCKET_NAME = 'fundoonote-bucket'
 # AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 #
