@@ -252,6 +252,60 @@ NOTIFICATIONS_CHANNELS = {
 CELERY_TASK_ALWAYS_EAGER = True
 
 # logger
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('This will get logged')
+# logging.basicConfig(level=logging.DEBUG)
+# logging.debug('This will get logged')
 
+
+LOGGING = {
+'version': 1,
+'disable_existing_loggers': True,
+# filters will define when a logger should run
+'filters': {
+'require_debug_false': {
+'()': 'django.utils.log.RequireDebugFalse',
+},
+'require_debug_true': {
+'()': 'django.utils.log.RequireDebugTrue',
+},
+},
+# format in which logs will be written
+'formatters': {
+'simple': {
+'format': "%(levelname)s [%(filename)s:%(lineno)d] %(asctime)s %(message)s",
+'datefmt':'%m/%d/%Y %I:%M:%S'
+},
+
+'verbose': {
+'format':"%(levelname)s [%(filename)s:%(lineno)d] %(asctime)s %(message)s",
+'datefmt':'%m/%d/%Y %I:%M:%S',
+},
+},
+
+'handlers': {
+'debug_logfile': {
+'level': 'DEBUG',
+'filters': ['require_debug_true'], # do not run debug logger in production
+'class': 'logging.FileHandler',
+'filename': os.path.join(BASE_DIR, 'debug_logs.log'),
+'formatter': 'verbose'
+},
+'error_logfile': {
+'level': 'ERROR',
+'filters': ['require_debug_false'], # run logger in production
+'class': 'logging.FileHandler',
+'filename': os.path.join(BASE_DIR, 'error_logs.log'),
+'formatter': 'verbose'
+},
+},
+# here the handlers for the loggers and the level of each logger is defined
+'loggers': {
+'error_logger': {
+'handlers': ['error_logfile'],
+'level': 'ERROR'
+},
+'debug_logger': {
+'handlers': ['debug_logfile'],
+'level': 'DEBUG'
+},
+}
+}

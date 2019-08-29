@@ -1,5 +1,4 @@
-from fundoonote.models import Account, Notess
-from rest_framework.response import Response
+from fundoonote.models import Account, Notes
 
 
 class NoteServices:

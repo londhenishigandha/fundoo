@@ -5,7 +5,7 @@ import redis
 from boto3.s3.transfer import S3Transfer
 import logging
 import self as self
-from .decorators import my_login_required
+from django.utils.decorators import method_decorator
 from .documents import NotesDocument
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect, JsonResponse
@@ -13,8 +13,9 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 import jwt
 from .service import redis_methods
-from rest_framework import generics, viewsets, status, serializers
-from .models import Notess, Labels
+from .decorators import my_login_required
+from rest_framework import status, serializers
+from .models import Notes, Labels
 from .serializers import NoteSerializer, NotesDocumentSerializer, RegisterSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
@@ -25,10 +26,9 @@ from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.template.loader import render_to_string
 from .tokens import account_activation_token
-from django.contrib.auth.models import User
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.contrib.auth import login, authenticate
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -48,6 +48,8 @@ from django_elasticsearch_dsl_drf.filter_backends import (
 from django_elasticsearch_dsl_drf.viewsets import DocumentViewSet
 from .models import Account
 from fundoonote.services.Service import Service
+debug_logger = logging.getLogger('debug_logger')
+error_logger = logging.getLogger('error_logger')
 logger = logging.getLogger(__name__)
 
 
@@ -70,18 +72,16 @@ def user_logout(request):
 def user_login(request):
     # print(request.data)
     request_data = json.loads((request.body).decode('utf-8'))
-    print(type(request_data), '------------>')
     print(request_data)
     if request.method == 'POST':
         # username = request.POST.get('username')
         username = request_data['username']
-        print(username, '---------------->')
         # password = request.POST.get('password')
         password = request_data['password']
-        print(password, '------------>')
         # authenticate the user n password
         user = authenticate(username=username, password=password)
         # check if user details is valid or not
+        debug_logger.debug("Validating Data")
         if user:
             if user.is_active:
                 payload = {
@@ -95,6 +95,7 @@ def user_login(request):
                 restoken = redis_methods.get_token(self, 'token')
                 print("token in redis", restoken)
                 login(request, user)
+                debug_logger.debug("Validating Error")
                 message = "you have successfully logged in"
                 res = message
                 result = {
@@ -108,13 +109,14 @@ def user_login(request):
                 }
                 print(result)
                 return JsonResponse({'result': result})
-                #  decode_jwt_token
+                # decode_jwt_token
             else:
+                error_logger.error("Account Inactive Error")
                 message = "Your account was inactive."
                 status_code = 400
                 return JsonResponse({'message': message, 'status': status_code})
         else:
-            print("Someone tried to login and failed.")
+            error_logger.error("Login Failed")
             print("They used username: {} and password: {}".format(username, password))
             message = "Invalid login details given"
             status_code = 400
@@ -125,14 +127,13 @@ def user_login(request):
 
 class RegisterView(APIView):
     serializer_class = RegisterSerializer
-
+    @csrf_exempt
     def post(self, request):
         redis = redis_methods()
         serializer = RegisterSerializer(data=request.data)
-        print("Serializers", serializer)
-        print(serializer.is_valid())
         if serializer.is_valid():
             user = serializer.save()
+            debug_logger.debug("Validating Data..")
             if user:
                 # get the current site url
                 current_site = get_current_site(request)
@@ -146,11 +147,10 @@ class RegisterView(APIView):
                                             'token': account_activation_token.make_token(user)  # pass the token
                                         })
                 to_email = serializer.validated_data.get('email')  # get the user email
-                print(to_email)
                 email = EmailMessage(mail_subject, message, to=[to_email])
                 email.send()  # send the mail for activation account
-                print(serializer.data)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
+        error_logger.error("Not Valid data..")
         return Response(serializer.errors)
 
 
@@ -162,6 +162,7 @@ def activate(request, uidb64, token):
         print(user)
     except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
+    debug_logger.debug("Validating Data")
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
         user.save()
@@ -169,18 +170,19 @@ def activate(request, uidb64, token):
         # return redirect('home')
         return HttpResponse('Thank you for your email confirmation. Now you can login your account.')
     else:
+        error_logger.error("Invalid link..")
         return HttpResponse('Activation link is invalid!')
 
 
 class Forgot(APIView):
-
+    @csrf_exempt
     def post(self, request):
         email = request.data.get('email')
         print(email)
         domain = "localhost:3000/confirm"
+        debug_logger.debug("Validating data")
         if email:
             user = Account.objects.get(email=email)
-            print(user)
             current_site = get_current_site(request)
             mail_subject = "Reset your password"
             # create the email body with activation link
@@ -195,8 +197,8 @@ class Forgot(APIView):
             email.send()  # send the mail for activation account
             # return message
             return HttpResponse('Please confirm your email address to complete the registration')
-            # return HttpResponse({"asda": "Mail Send Success Check Link"})
         else:
+            error_logger.error("Failed")
             return HttpResponse({"abc": "Fail"})
 
 
@@ -207,6 +209,7 @@ def forgot_pass_activate(request, uidb64, token):
         user = Account.objects.get(pk=uid)
     except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
+    debug_logger.debug("Validating Data")
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
         user.save()
@@ -214,6 +217,7 @@ def forgot_pass_activate(request, uidb64, token):
         # return redirect('home')
         return HttpResponse('Thank you for your email confirmation. Now you can reset your password:')
     else:
+        error_logger.error("Account Inactive Error")
         return HttpResponse('Activation link is invalid!')
 
 
@@ -225,10 +229,15 @@ def confirm(request, uidb64, token):
         print(user)
     except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
+    debug_logger.debug("Validating Data")
     if user is not None and account_activation_token.check_token(user, token):
         user.setpassword = True
         user.save()
         return HttpResponse('Password reset:')
+    else:
+        error_logger.error("Reset password is not send")
+        return HttpResponse('Error in password reset')
+
 
 
 @login_required
@@ -241,6 +250,7 @@ class NoteView(APIView):
     serializer_class = NoteSerializer
     permission_classes = [AllowAny]
 
+    @method_decorator(my_login_required)
     def get(self, request):
         redistoken = redis_methods.get_token(self, 'token')  # gets the token from the redis cache
         print("get the  Token", redistoken)
@@ -250,22 +260,16 @@ class NoteView(APIView):
         user_id = decoded_token.get('id')
         user = Account.objects.get(id=user_id)
         # print("Name of the user: ", user)
-        notes = Notess.objects.filter(is_trash=False, created_by=user, is_archive=False, is_pin=False).order_by('id')
-        # print("note", notes)
-        # labels= Labels.objects.filter(id=user_id)
+        notes = Notes.objects.filter(is_trash=False, created_by=user, is_archive=False, is_pin=False).order_by('id')
         serializer = NoteSerializer(notes, many=True).data
         length = len(serializer)
-        # print(length, '------------->')
         my_labels = []
         for index in range(0, length):
             if len(serializer[index]['label']) is not 0:
                 for lb in range(0, len(serializer[index]['label'])):
                     label_id = serializer[index]['label'].pop(lb)
-                    # print(serializer[index]['label'])
                     label_name = Labels.objects.get(id=label_id).label
-                    # print(label_name)
                     serializer[index]['label'].insert(0, label_name)
-        # print(length, '------------->')
         # for collaborate
         for index in range(0, length):
             if len(serializer[index]['collaborate']) is not 0:
@@ -281,10 +285,9 @@ class NoteView(APIView):
         r.set('mydict', p_mydict)
         read_dict = r.get('mydict')
         yourdict = pickle.loads(read_dict)
-        # print("Notes in redis cache", yourdict)
-
         return Response(serializer, status=200)
 
+    @method_decorator(my_login_required)
     def post(self, request):
         restoken = redis_methods.get_token(self, 'token')
         decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
@@ -294,13 +297,12 @@ class NoteView(APIView):
         user = Account.objects.get(id=dec_id)
         print("username", user)
         serializer = NoteSerializer(data=request.data)
-        print("dataaaa", serializer)
-        print("username", serializer.is_valid())
-        print("username...", serializer.errors)
         try:
+            debug_logger.debug("Validating Data")
             if serializer.is_valid():
                 serializer.save(created_by=user)
         except serializers.ValidationError:
+            error_logger.error("Error")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.data)
 
@@ -310,9 +312,9 @@ class NoteDetailView(APIView):
 
     def get_object(self, id=None):
         try:
-            a = Notess.objects.get(id=id)
+            a = Notes.objects.get(id=id)
             return a
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
@@ -324,12 +326,12 @@ class NoteDetailView(APIView):
         data = request.data
         instance = self.get_object(id)
         serializer = NoteSerializer(instance, data=data, partial=True)
-        print(data)
-        print(serializer.is_valid())
         try:
+            debug_logger.debug("Validating Data")
             if serializer.is_valid():
                 serializer.save()
         except serializers.ValidationError:
+            error_logger.error("Error")
             return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return JsonResponse(serializer.data, status=200)
 
@@ -338,7 +340,6 @@ class NoteDetailView(APIView):
             # get the object of that note_od by passing note_id to the getobject() FUNCTION
             instance = self.get_object(id)
             # check the note is_deleted and is_trashed status Of both are true then update both the values
-            print(instance)
             if instance.is_deleted == False:
                 # update the is_deleted
                 instance.is_deleted = True
@@ -348,33 +349,34 @@ class NoteDetailView(APIView):
                 instance.save()
             # return the response
             return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
 # To Archieve the note
 class ArchiveGetNotes(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request):
-        notes = Notess.objects.filter(is_archive=True)
+        notes = Notes.objects.filter(is_archive=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
 
 class ArchieveNote(APIView):
-
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
         try:
-            a = Notess.objects.get(id=id)
+            a = Notes.objects.get(id=id)
             return a
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
-        notes = Notess.objects.filter(is_archive=True, id=id)
+        notes = Notes.objects.filter(is_archive=True, id=id)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         """  This handles PUT request to achieve particular note by note id  """
         result = {
@@ -386,15 +388,16 @@ class ArchieveNote(APIView):
         data = request.data['is_archive']
         print("Data", data)
         try:
+            debug_logger.debug("Validating Data")
             if not id:
                 raise ValueError
             logger.debug("Enter In The Try Block")
             # get the note object by passing the note id
             instance = self.get_object(id)
             if not instance:
-                raise Notess.DoesNotExist
+                raise Notes.DoesNotExist
             # check note is not trash and not deleted
-            # print(instance, "=====================")
+            debug_logger.debug("Validating Data")
             if not instance.is_archive:
                 # update the record and set the archive
                 instance.is_archive = data
@@ -407,39 +410,40 @@ class ArchieveNote(APIView):
                 return Response(result, status=200)
         # except the exception and return the response
         except ValueError as e:
-            result["Message"] = "Note id cant blank"
-            logger.debug("Return The Response To The Browser..")
+            result["Message"] = "Note id can't blank"
+            error_logger.error("Note id can't be blank")
             return Response(result, status=204)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             result["message"] = "No record found for note id "
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("No records found")
         return Response(result, status=204)
 
 
 class UnArchiveGetNotes(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request):
-        notes = Notess.objects.fUnArchieveNoteilter(is_archive=False)
+        notes = Notes.objects.fUnArchieveNoteilter(is_archive=False)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
 
 class UnArchieveNote(APIView):
-
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
         try:
-            a = Notess.objects.get(id=id)
+            a = Notes.objects.get(id=id)
             return a
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, id=None):
-        notes = Notess.objects.filter(is_archive=False, id=id)
+        notes = Notes.objects.filter(is_archive=False, id=id)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
-        """  This handles PUT request to achieve particular note by note id  """
+        """  This handles PUT request to Unachieve particular note by note id  """
         result = {
             "message": "Something bad happened",
             "success": False,
@@ -447,17 +451,16 @@ class UnArchieveNote(APIView):
         }
         logger.info("Enter In The PUT Method Set archive API")
         data = request.data['is_archive']
-        print("Data", data)
         try:
+            debug_logger.debug("Validating Data")
             if not id:
                 raise ValueError
-            logger.debug("Enter In The Try Block")
             # get the note object by passing the note id
             instance = self.get_object(id)
             if not instance:
-                raise Notess.DoesNotExist
+                raise Notes.DoesNotExist
             # check note is not trash and not deleted
-            # print(instance, "=====================")
+            debug_logger.debug("Validating Data")
             if not instance.is_archive:
                 # update the record and set the archive
                 instance.is_archive = False
@@ -471,18 +474,18 @@ class UnArchieveNote(APIView):
         # except the exception and return the response
         except ValueError as e:
             result["Message"] = "Note id cant blank"
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("Note id can't be blank")
             return Response(result, status=204)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             result["message"] = "No record found for note id "
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("Records not found")
         return Response(result, status=204)
 
 
 class PinGetNotes(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request):
-        notes = Notess.objects.filter(is_pin=True)
+        notes = Notes.objects.filter(is_pin=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
@@ -492,10 +495,11 @@ class pinNote(APIView):
 
     def get_object(self, id=None):
         try:
-            return Notess.objects.get(id=id)
-        except Notess.DoesNotExist as e:
+            return Notes.objects.get(id=id)
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         """  This handles PUT request to pin particular note by note id  """
         result = {
@@ -513,9 +517,9 @@ class pinNote(APIView):
             # get the note object by passing the note id
             instance = self.get_object(id)
             if not instance:
-                raise Notess.DoesNotExist
+                raise Notes.DoesNotExist
             # check note is not trash and not deleted
-            # print(instance, "=====================")
+            debug_logger.debug("Validating Data")
             if not instance.is_pin:
                 # update the record and set the archive
                 instance.is_pin = data
@@ -524,39 +528,34 @@ class pinNote(APIView):
                 result["message"] = "pin Successfully"
                 result["success"] = True
                 result["data"] = data
-                logger.debug("Return The Response To The Browser..")
                 return Response(result, status=200)
         # except the exception and return the response
         except ValueError as e:
             result["Message"] = "Note id cant blank"
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("Note id can't blank")
             return Response(result, status=204)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             result["message"] = "No record found for note id "
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("No records found")
         return Response(result, status=204)
 
 
 class UnPinGetNotes(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request):
-        notes = Notess.objects.filter(is_pin=False)
+        # get the onject of notes and check pin or not
+        notes = Notes.objects.filter(is_pin=False)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
 
 class PinnedNotes(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request, id=None):
-        notes = Notess.objects.filter(is_pin=True)
-        # serializer = NoteSerializer(notes, many=True).data
-        # notes = Notess.objects.filter(is_trash=False, created_by=user, is_archive=False, is_pin=False).order_by('id')
-
-        # labels= Labels.objects.filter(id=user_id)
+        # get the object of notes and filter pin==true
+        notes = Notes.objects.filter(is_pin=True)
         serializer = NoteSerializer(notes, many=True).data
-        # print("note==========", serializer)
         length = len(serializer)
-        # print(length, '------------->')
         my_labels = []
         for index in range(0, length):
             if len(serializer[index]['label']) is not 0:
@@ -566,33 +565,31 @@ class PinnedNotes(APIView):
                     label_name = Labels.objects.get(id=label_id).label
                     # print(label_name)
                     serializer[index]['label'].insert(0, label_name)
-        # print(length, '------------->')
         # for collaborate
         for index in range(0, length):
             if len(serializer[index]['collaborate']) is not 0:
                 for lb in range(0, len(serializer[index]['collaborate'])):
                     label_id = serializer[index]['collaborate'].pop(lb)
-                    print(serializer[index]['collaborate'])
                     label_name = Account.objects.get(id=label_id).email
-                    print(label_name)
                     serializer[index]['collaborate'].insert(0, label_name)
         return Response(serializer, status=200)
 
 
 # To pin
 class UnpinNote(APIView):
-
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
         try:
-            return Notess.objects.get(id=id)
-        except Notess.DoesNotExist as e:
+            return Notes.objects.get(id=id)
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
-        notes = Notess.objects.filter(is_pin=False, id=id)
+        notes = Notes.objects.filter(is_pin=False, id=id)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         """  This handles PUT request to pin particular note by note id  """
         result = {
@@ -610,9 +607,9 @@ class UnpinNote(APIView):
             # get the note object by passing the note id
             instance = self.get_object(id)
             if not instance:
-                raise Notess.DoesNotExist
+                raise Notes.DoesNotExist
             # check note is not trash and not deleted
-            print(instance, "=====================")
+            debug_logger.debug("Validating Data")
             if not instance.is_pin:
                 # update the record and set the archive
                 instance.is_pin = data
@@ -626,53 +623,55 @@ class UnpinNote(APIView):
         # except the exception and return the response
         except ValueError as e:
             result["Message"] = "Note id cant blank"
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("Note id can't be blank")
             return Response(result, status=204)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             result["message"] = "No record found for note id "
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("No records found")
         return Response(result, status=204)
 
 
 # for trash
 class TrashView(APIView):
+    @method_decorator(my_login_required)
     def get(self, request, is_trash=None):
-        notes = Notess.objects.filter(is_trash=True)
+        notes = Notes.objects.filter(is_trash=True)
         serializer = NoteSerializer(notes, many=True).data
         return Response(serializer, status=200)
 
 
 class ReminderView(APIView):
+    @method_decorator(my_login_required)
     def get(self, request, is_trash=None):
-        trashed_notes = Notess.objects.filter(reminder__isnull=False, is_trash=False).order_by('-id')
+        trashed_notes = Notes.objects.filter(reminder__isnull=False, is_trash=False).order_by('-id')
         serializer = NoteSerializer(trashed_notes, many=True).data
         return Response(serializer, status=200)
 
 
 # to create a label view
 class LabelView(APIView):
-
+    @method_decorator(my_login_required)
     def get(self, request):
+        # get the objebct of labels
         label = Labels.objects.filter(is_deleted=False)
         serializer = LabelSerializer(label, many=True).data
-        # print('serializer----<>', serializer)
         length = len(serializer)
         my_labels = []
         for index in range(0, length):
             my_labels.append(serializer[index]['label'])
-        # print(my_labels)
         return Response(serializer, status=200)
 
+    @method_decorator(my_login_required)
     def post(self, request):
-        print(request.data)
         user = request.user
-        print(user)
         serializer = LabelSerializer(data=request.data)
-        # print(serializer.errors)
         try:
+            debug_logger.debug("Validating Data")
+            # check if serializer is valid ?
             if serializer.is_valid():
                 serializer.save()
         except serializers.ValidationError:
+            error_logger.error("Error")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response(serializer.data, status=200)
@@ -680,7 +679,7 @@ class LabelView(APIView):
 
 # for update and delete the label
 class LabelDetailView(APIView):
-
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
         try:
             a = Labels.objects.get(id=id)
@@ -695,12 +694,15 @@ class LabelDetailView(APIView):
 
     def put(self, request, id=None):
         data = request.data
+        # get the instance
         instance = self.get_object(id)
         serializer = LabelSerializer(instance, data=data)
         try:
+            debug_logger.debug("Validating Data")
             if serializer.is_valid():
                 serializer.save()
         except serializers.ValidationError:
+            error_logger.error("Error")
             return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return JsonResponse(serializer.data, status=200)
 
@@ -709,7 +711,7 @@ class LabelDetailView(APIView):
             # get the object of that note_od by passing note_id to the get_object() function
             instance = self.get_object(id)
             # check the node is_deleted and is_trashed status Of both are True Then Update Both The Values
-            print(instance)
+            debug_logger.debug("Validating Data")
             if instance.is_deleted == False:
                 # update the is_deleted
                 instance.is_deleted = True
@@ -719,12 +721,13 @@ class LabelDetailView(APIView):
                 instance.save()
             # return the response
             return Response({"Message": "Note Deleted Successfully And Added To The Trash."}, status=200)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
+            error_logger.error("Note does not exist")
             return Response({"Error": "Note Does Not Exist Or Deleted.."}, status=Response.status_code)
 
 
 class Addlabels(APIView):
-
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
         try:
             a = Labels.objects.get(id=id)
@@ -734,9 +737,9 @@ class Addlabels(APIView):
 
     def get_noteobject(self, id=None):
         try:
-            note = Notess.objects.get(id=id)
+            note = Notes.objects.get(id=id)
             return note
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
@@ -744,6 +747,7 @@ class Addlabels(APIView):
         serializer = LabelSerializer(label).data
         return Response(serializer)
 
+    @method_decorator(my_login_required)
     def post(self, request, id=None):
         result = {
             "message": "Something bad happened",
@@ -752,43 +756,48 @@ class Addlabels(APIView):
         }
         print(request.data)
         label_id = request.data.get('label')
-        print("----------------->", label_id)
+        # check if label id or not
         if not label_id:
             print("error")
         else:
             label_obj = Labels.objects.get(id=label_id)
-            print(label_obj)
+        debug_logger.debug("Validating Data")
+        # check the note id
         if not id:
-                print("note id id not valid:")
+                print("note id not valid:")
         else:
-            note_obj = Notess.objects.get(id=id)
-            print("--------------->", note_obj)
+            note_obj = Notes.objects.get(id=id)
             note_obj.label.add(label_obj)
             note_obj.save()
-            print(id)
             return Response("True", status=200)
 
 
 class DeleteLabel(APIView):
-
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         print(request.data)
+        # get the label name
         labelname = request.data.get('label')
+        # get the label object
         label_obj = Labels.objects.get(label=labelname)
-        note_obj = Notess.objects.get(id=id)
-
-        print(label_obj, note_obj, id, labelname)
+        # get the note object
+        note_obj = Notes.objects.get(id=id)
+        debug_logger.debug("Validating Data")
         if note_obj and label_obj:
             note_obj.label.remove(label_obj.id)
-        return Response("Label Deleted", status=200)
+            return Response("Label Deleted", status=200)
+        else:
+            error_logger.error("Account Inactive Error")
+        return Response("Label not exist or already deleted")
 
 
 class SetReminder(APIView):
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
         try:
-            a = Notess.objects.get(id=id)
+            a = Notes.objects.get(id=id)
             return a
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             return Response({"error": "Given object not found."}, status=404)
 
     def get(self, request, id=None):
@@ -796,6 +805,7 @@ class SetReminder(APIView):
         serializer = NoteSerializer(notes).data
         return Response(serializer)
 
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         """  This handles PUT request to set the reminder to perticular note by note id  """
         result = {
@@ -804,7 +814,6 @@ class SetReminder(APIView):
             "data": []
         }
         logger.info("Enter In The PUT Method Set Reminder API")
-        print("data=========================", request.data)
         data = request.data['reminder']
         print("Data", data)
         try:
@@ -814,8 +823,9 @@ class SetReminder(APIView):
             # get the note object by passing the note id
             instance = self.get_object(id)
             if not instance:
-                raise Notess.DoesNotExist
+                raise Notes.DoesNotExist
             # check note is not trash and not deleted
+            debug_logger.debug("Validating Data")
             if not instance.is_trash:
                 # update the record and set the reminder
                 instance.reminder = data
@@ -831,9 +841,9 @@ class SetReminder(APIView):
             result["Message"] = "Note id cant blank"
             logger.debug("Return The Response To The Browser..")
             return Response(result, status=204)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             result["message"] = "No record found for note id "
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("No records found")
         return Response(result, status=204)
 
 
@@ -870,6 +880,7 @@ def s3_upload(request):
             # taking input image files
             uploaded_file = request.FILES.get('document')
             print(uploaded_file)
+            debug_logger.debug("Validating Data")
             if uploaded_file is None:
                 message = "Empty file can not be uploaded"
                 status_code = 400
@@ -886,15 +897,16 @@ def s3_upload(request):
                 firstname = user.firstname
                 print('name', firstname)
                 file_name = user.firstname+".jpg"
-                print("File=============", file_name)
                 s3_client = boto3.client('s3')
                 s3_client.upload_fileobj(uploaded_file, 'fundoo-bucket', Key=file_name)
                 message = "Image successfully uploaded"
+                logger.info(message)
                 status_code = 200     # success msg
                 return JsonResponse({'message': message, 'status': status_code})
         else:
             status_code = 400    # bad request
             message = "The request is not valid."
+            error_logger.error("Invalid request")
             return JsonResponse({'message': message, 'status': status_code})
 
     except RuntimeError:
@@ -959,11 +971,12 @@ class NotesDocumentViewSet(DocumentViewSet):
 
 
 class Notecollaborator(APIView):
-
+    @method_decorator(my_login_required)
     def get_object(self, id=None):
-        obj = Notess.objects.get(id=id)
+        obj = Notes.objects.get(id=id)
         return obj
 
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         """ This handles PUT request to collaborate particular note by note id """
         result = {
@@ -988,14 +1001,18 @@ class Notecollaborator(APIView):
             restoken = redis_methods.get_token(self, 'token')
             # decoding to get user id and username
             decoded_token = jwt.decode(restoken, 'secret', algorithms=['HS256'])
+            # get the id
             decoded_id = decoded_token.get('id')
             decoded_email = decoded_token.get('email')
             user = Account.objects.get(id=decoded_id)
+            debug_logger.debug("Validating Data")
+            # checking in database that input collaborate email is present in database or not
             if collaborator_email:
-                # print("data available in database", collaborator_email)
+                # checking collaborate email and logged in user email id is same or not
                 if collaborator_email is decoded_email:
                     return Response('with same email id can not be collaborate, Please pass the correct email id')
                 else:
+                    # collaborating collaborate user id with note
                     noteinstance.collaborate.add(int(collaborate_id))
                     noteinstance.save()
                     current_site = get_current_site(request)
@@ -1014,7 +1031,6 @@ class Notecollaborator(APIView):
                     result["message"] = "Please check your email address to get the collaborated note"
                     result["success"] = True
                     result["data"] = colobrate_data
-                    logger.debug("Return The Response To The Browser..")
                     return Response(result, status=200)
             else:
                 result["message"] = "User not found"
@@ -1023,21 +1039,21 @@ class Notecollaborator(APIView):
                 return Response(result, status=404)
         except ValueError as e:
             result["Message"] = "Note id cant blank"
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("Note id can't be blank")
             return Response(result, status=204)
-        except Notess.DoesNotExist as e:
+        except Notes.DoesNotExist as e:
             result["message"] = "No record found for note id "
-            logger.debug("Return The Response To The Browser..")
+            error_logger.error("Invalid request")
         return Response(result, status=200)
 
 
 class Collaborator(APIView):
-
+    @method_decorator(my_login_required)
     def put(self, request, id=None):
         res = {}
         serv_obj = Service()
-        print(request.data)
         collaborator_email = request.data.get('collaborate')
+        debug_logger.debug("Validating Data")
         if not collaborator_email:
             res['msg'] = "Email is required"
             return Response(res, status=200)
@@ -1046,42 +1062,45 @@ class Collaborator(APIView):
 
 
 class AddCollab(APIView):
-
-    def post(self, request, note_id=None):
+    def post(self, request, id=None):
         res = {
-            'message':'',
+            'message': '',
             'success': False
         }
         try:
             service_obj = Service()
-            if not note_id:
+            if not id:
                 raise ValueError("Note is is required")
             collaborator_email = request.data.get('collaborate')
+            debug_logger.debug("Validating Data")
             if not collaborator_email:
                 raise ValueError("Email is required")
-
-            if service_obj.collaborator(collaborator_email, note_id):
+            result = service_obj.collaborator(collaborator_email, id)
+            debug_logger.debug("Validating Data")
+            if result:
                 res['message'] = "Note Collaborated.."
                 res['success'] = True
                 return Response(res, status=200)
             else:
                 res['message'] = "failed"
         except Exception as e:
-            print(e)
-
+            error_logger.error("Invalid request")
         return Response(res, status=400)
 
 
 class getAllUser(APIView):
+    @method_decorator(my_login_required)
     def get(self, request, id=None):
         user = Account.objects.all()
         data = Account.objects.distinct("email").all()
         collaborate_user = Account.objects.all() & Account.objects.filter(is_active=1)
         users = []
+        debug_logger.debug("Validating Data")
         if data:
             for email in user:
                 users.append(email.email)
             user_list = users
         else:
+            error_logger.error("Error in finding users")
             return Response('Error')
         return Response(user_list)

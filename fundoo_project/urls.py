@@ -90,7 +90,7 @@ urlpatterns = [
     # get all user through email id
     path('user_email/', views.getAllUser.as_view(), name='user'),
 
-
+    path('collaborator1/<int:id>/', views.AddCollab.as_view(), name='collaborator1'),
     url('', include(router.urls)),
 ]
 

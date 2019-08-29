@@ -1,6 +1,6 @@
 from django_elasticsearch_dsl import DocType, Index, fields
 from .index import note_index, html_strip
-from .models import Notess
+from .models import Notes
 from elasticsearch_dsl.connections import connections
 
 # to create a connections
@@ -34,4 +34,4 @@ class NotesDocument(DocType):
     created_at = fields.DateField()
 
     class Meta(object):
-        model = Notess
+        model = Notes

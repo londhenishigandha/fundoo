@@ -1,5 +1,4 @@
 from django.db import models
-from django.db import models
 from django.contrib.auth.models import (BaseUserManager, AbstractBaseUser)
 from django.conf import settings
 
@@ -86,10 +85,9 @@ class UserProfileInfo(models.Model):
 class Labels(models.Model):
     label = models.TextField(max_length=100, unique=True)
     is_deleted = models.BooleanField(default=False)
-    # note = models.ManyToManyField(Notess, blank=True)
 
 
-class Notess(models.Model):
+class Notes(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, default=1, related_name='owner')
     label = models.ManyToManyField(Labels, related_name='note_labels', blank=True)
     title = models.CharField(max_length=100)
@@ -111,11 +109,4 @@ class Notess(models.Model):
     def __str__(self):
         return self.title
 
-
-class Mapping(models.Model):
-    label_id = models.ForeignKey(Labels, on_delete=models.CASCADE, default=1)
-    note_id = models.IntegerField()
-
-    def __str__(self):
-        return self.title
 

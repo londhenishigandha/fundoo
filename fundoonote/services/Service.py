@@ -1,6 +1,6 @@
 from fundoonote.services.noteServices import NoteServices
 from fundoonote.services.userServices import UserService
-from fundoonote.models import Account, Notess
+from fundoonote.models import Account, Notes
 from django.core.exceptions import ObjectDoesNotExist
 
 
@@ -25,17 +25,16 @@ class Service:
     def collaborator(self, email, note_id):
         try:
 
-            collaborate_user = Account.objects.filter(email=email, is_active=True)
+            collaborate_user = Account.objects.get(email=email)
             if not collaborate_user:
                 raise ObjectDoesNotExist("User Not Exist..")
 
-            note_obj = Notess.objects.get(id=note_id)
+            note_obj = Notes.objects.get(id=note_id)
             if not note_obj:
                 raise ObjectDoesNotExist("Note not exist..")
 
-            note_obj.collaborate.add(collaborate_user)
-            if note_obj:
-                return True
+            note_obj.collaborate.add(collaborate_user.id)
+            return True
 
         except ObjectDoesNotExist as e:
             print(e)

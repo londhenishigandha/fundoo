@@ -2,17 +2,10 @@ from django.contrib.auth.models import User
 from .models import Account
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-
-from .models import Notess
+from .models import Notes
 from .models import Labels
 from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
 from .documents import NotesDocument
-
-
-# class LoginSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = User
-#         fields = ('username', 'password')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -38,7 +31,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class NoteSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = Notess
+        model = Notes
         fields = ('id', 'title', 'content', 'created_at', 'updated_at', 'image', 'color', 'is_archive', 'is_pin',
                   'is_trash', 'created_by', 'reminder', 'label', 'collaborate')
 
