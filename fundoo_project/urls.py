@@ -6,12 +6,12 @@ from rest_framework_swagger.views import get_swagger_view
 from django.views.generic.base import TemplateView
 from fundoonote import views
 from rest_framework import routers
-
+#
 app_name = 'fundoonote'
-
-router = routers.DefaultRouter()
-router.register(r'search', views.NotesDocumentViewSet, basename='search')
-
+#
+# router = routers.DefaultRouter()
+# router.register(r'search', views.NotesDocumentViewSet, basename='search')
+#
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -91,7 +91,7 @@ urlpatterns = [
     path('user_email/', views.getAllUser.as_view(), name='user'),
 
     path('collaborator1/<int:id>/', views.AddCollab.as_view(), name='collaborator1'),
-    url('', include(router.urls)),
+    # url('', include(router.urls)),
 ]
 
 

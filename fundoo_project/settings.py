@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 from __future__ import absolute_import
 import os
 from dotenv import load_dotenv, find_dotenv
-import logging
 
 
 # This will make sure the app is always imported when
@@ -56,8 +55,8 @@ INSTALLED_APPS = [
     'notifications',
     'webpush',
     'fundoonote',
-    'django_elasticsearch_dsl',
-    'django_elasticsearch_dsl_drf',
+    # 'django_elasticsearch_dsl',
+    # 'django_elasticsearch_dsl_drf',
     'corsheaders'
 ]
 
@@ -105,11 +104,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'fundoo_project.wsgi.application'
 
-ELASTICSEARCH_DSL = {
-    'default': {
-        'hosts': 'localhost:9200'
-    },
-}
+# ELASTICSEARCH_DSL = {
+#     'default': {
+#         'hosts': 'localhost:9200'
+#     },
+# }
 
 
 DATABASES = {

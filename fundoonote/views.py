@@ -6,7 +6,7 @@ from boto3.s3.transfer import S3Transfer
 import logging
 import self as self
 from django.utils.decorators import method_decorator
-from .documents import NotesDocument
+# from .documents import NotesDocument
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse
@@ -16,7 +16,7 @@ from .service import redis_methods
 from .decorators import my_login_required
 from rest_framework import status, serializers
 from .models import Notes, Labels
-from .serializers import NoteSerializer, NotesDocumentSerializer, RegisterSerializer
+from .serializers import NoteSerializer, RegisterSerializer
 from .serializers import LabelSerializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -861,8 +861,11 @@ def awss3(request):
                 for filename in files:
                     local_path = os.path.join(root, 'sheet.jpeg')
                     relative_path = os.path.relpath(local_path, local_directory)
+                    # name create in aws
                     s3_path = os.path.join('s3 path1', relative_path)
+                    # check if the file ends with .jpeg
                     if filename.endswith('.jpeg'):
+                        # transfer uploaded file to s3
                         transfer.upload_file(local_path, bucket, s3_path, extra_args={'ACL': 'private-read'})
                     else:
                         transfer.upload_file(local_path, bucket, s3_path)
@@ -912,63 +915,63 @@ def s3_upload(request):
     except RuntimeError:
         print(" ")
 
-
-# For note document view to search data
-class NotesDocumentViewSet(DocumentViewSet):
-    document = NotesDocument
-    serializer_class = NotesDocumentSerializer
-    lookup_field = 'id'
-    filter_backends = [
-        FilteringFilterBackend,
-        OrderingFilterBackend,
-        DefaultOrderingFilterBackend,
-        CompoundSearchFilterBackend,
-        FunctionalSuggesterFilterBackend
-    ]
-
-    # search in all fields in one request
-    search_fields = (
-        'title',
-        'content',
-        'color',
-    )
-
-    # List of filter fields
-    filter_fields = {
-        'id': {
-            'field': 'id',
-            'lookups': [
-                # to set the extent search,
-                LOOKUP_FILTER_RANGE,
-                LOOKUP_QUERY_IN,
-                # to search elements greater than the given value
-                LOOKUP_QUERY_GT,
-                # to search for the elements equal and greater than the given value
-                LOOKUP_QUERY_GTE,
-                # to search for the elements lesser than the given value
-                LOOKUP_QUERY_LT,
-                # to search for the elements equal and lesser than the given value.
-                LOOKUP_QUERY_LTE,
-            ],
-        },
-        'title': 'title.raw',
-        'content': 'content.raw',
-        'color': 'color.raw',
-    }
-
-    # set ordering fields
-    ordering_fields = {
-        'title': 'title.raw',
-        'content': 'content.raw',
-        'color': 'color.raw',
-
-    }
-
-    functional_suggester_fields = {
-        'title': 'title.raw',
-        'content': 'content.raw',
-    }
-
+#
+# # For note document view to search data
+# class NotesDocumentViewSet(DocumentViewSet):
+#     document = NotesDocument
+#     serializer_class = NotesDocumentSerializer
+#     lookup_field = 'id'
+#     filter_backends = [
+#         FilteringFilterBackend,
+#         OrderingFilterBackend,
+#         DefaultOrderingFilterBackend,
+#         CompoundSearchFilterBackend,
+#         FunctionalSuggesterFilterBackend
+#     ]
+#
+#     # search in all fields in one request
+#     search_fields = (
+#         'title',
+#         'content',
+#         'color',
+#     )
+#
+#     # List of filter fields
+#     filter_fields = {
+#         'id': {
+#             'field': 'id',
+#             'lookups': [
+#                 # to set the extent search,
+#                 LOOKUP_FILTER_RANGE,
+#                 LOOKUP_QUERY_IN,
+#                 # to search elements greater than the given value
+#                 LOOKUP_QUERY_GT,
+#                 # to search for the elements equal and greater than the given value
+#                 LOOKUP_QUERY_GTE,
+#                 # to search for the elements lesser than the given value
+#                 LOOKUP_QUERY_LT,
+#                 # to search for the elements equal and lesser than the given value.
+#                 LOOKUP_QUERY_LTE,
+#             ],
+#         },
+#         'title': 'title.raw',
+#         'content': 'content.raw',
+#         'color': 'color.raw',
+#     }
+#
+#     # set ordering fields
+#     ordering_fields = {
+#         'title': 'title.raw',
+#         'content': 'content.raw',
+#         'color': 'color.raw',
+#
+#     }
+#
+#     functional_suggester_fields = {
+#         'title': 'title.raw',
+#         'content': 'content.raw',
+#     }
+#
 
 class Notecollaborator(APIView):
     @method_decorator(my_login_required)

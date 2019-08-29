@@ -5,7 +5,7 @@ from rest_framework.validators import UniqueValidator
 from .models import Notes
 from .models import Labels
 from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
-from .documents import NotesDocument
+# from .documents import NotesDocument
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -41,14 +41,14 @@ class LabelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Labels
         fields = ('id', 'label')
-
-
-class NotesDocumentSerializer(DocumentSerializer):
-    title = serializers.CharField(read_only=True)
-    content = serializers.CharField(read_only=True)
-    color = serializers.CharField(read_only=True)
-
-    class Meta:
-        document = NotesDocument
-        fields = ('id', 'title', 'content', 'color')
-
+#
+#
+# class NotesDocumentSerializer(DocumentSerializer):
+#     title = serializers.CharField(read_only=True)
+#     content = serializers.CharField(read_only=True)
+#     color = serializers.CharField(read_only=True)
+#
+#     class Meta:
+#         document = NotesDocument
+#         fields = ('id', 'title', 'content', 'color')
+#
